@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  MEDICAL_REP
+  DOCTOR
+  CLINIC_STAFF
+  CHEMIST
+  PHARMA_COMPANY
+  RECRUITER
+  ADMIN
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Doctor {
+  id                 String   @id @default(cuid())
+  name               String
+  specialty          String
+  qualification      String
+  hospital           String
+  chamberAddress     String
+  latitude           Float?
+  longitude          Float?
+  consultationTiming String
+  mrVisitingTime     String?
+  phone              String
+  secretaryContact   String?
+  languages          String
+  experience         Int
+  rating             Float    @default(0)
+  status             String   @default("Available")
+  visits             Visit[]
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model Visit {
+  id        String   @id @default(cuid())
+  doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  doctorId  String
+  date      String // calendar day of the call, "YYYY-MM-DD"
+  time      String // e.g. "4:30 PM"
+  status    String   @default("Visit Done")
+  notes     String?
+  mrEmail   String? // which MR logged it (optional for now)
+  createdAt DateTime @default(now())
+
+  @@index([date])
+  @@index([doctorId])
+}

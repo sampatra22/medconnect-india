@@ -1,0 +1,269 @@
+[
+  {
+    "id": 1,
+    "name": "Dr. Rajesh Kumar",
+    "specialty": "Cardiology",
+    "qualification": "MBBS, MD",
+    "hospital": "City Hospital, Delhi",
+    "chamber_address": "Sector 5, New Delhi",
+    "phone": "+91-9876543210",
+    "secretary_contact": "+91-9876543211",
+    "experience": 15,
+    "rating": 4.5,
+    "consultation_timing": "10 AM - 2 PM",
+    "mr_visiting_time": "2 PM - 4 PM",
+    "languages": [
+      "Hindi",
+      "English"
+    ],
+    "status": "available",
+    "patients_left": 3,
+    "patients_source": "mr_estimate",
+    "status_updated_at": "2026-07-09T03:20:05.440Z",
+    "status_updated_by_role": "medical_representative",
+    "status_updated_by_name": "test mr",
+    "updateHistory": [
+      {
+        "timestamp": "2026-07-09T03:20:05.440Z",
+        "user_id": "1783462566532",
+        "user_name": "test mr",
+        "user_email": "testmr@gmail.com",
+        "role": "medical_representative",
+        "changes": {
+          "patients_left": {
+            "from": 4,
+            "to": 3
+          }
+        }
+      },
+      {
+        "timestamp": "2026-07-09T03:20:03.004Z",
+        "user_id": "1783462566532",
+        "user_name": "test mr",
+        "user_email": "testmr@gmail.com",
+        "role": "medical_representative",
+        "changes": {
+          "patients_left": {
+            "from": 5,
+            "to": 4
+          }
+        }
+      },
+      {
+        "timestamp": "2026-07-09T03:19:23.562Z",
+        "user_id": 2,
+        "user_name": "Ravi Kumar",
+        "user_email": "ravi@medconnect.com",
+        "role": "medical_representative",
+        "changes": {
+          "patients_left": {
+            "from": 4,
+            "to": 5
+          }
+        }
+      },
+      {
+        "timestamp": "2026-07-09T03:15:23.148Z",
+        "user_id": 1,
+        "user_name": "Sam Patra",
+        "user_email": "sam@medconnect.com",
+        "role": "admin",
+        "changes": {
+          "status": {
+            "from": "no_mr_today",
+            "to": "available"
+          }
+        }
+      },
+      {
+        "timestamp": "2026-07-09T03:03:18.560Z",
+        "user_id": 1,
+        "user_name": "Sam Patra",
+        "user_email": "sam@medconnect.com",
+        "role": "admin",
+        "changes": {
+          "status": {
+            "from": "available",
+            "to": "no_mr_today"
+          }
+        }
+      }
+    ],
+    "status_updated_by_id": "1783462566532"
+  },
+  {
+    "id": 2,
+    "name": "Dr. Anjali Mehta",
+    "specialty": "Dermatology",
+    "qualification": "MBBS, MD (Skin & VD)",
+    "hospital": "Apollo Clinic, Mumbai",
+    "chamber_address": "Andheri West, Mumbai",
+    "phone": "+91-9812345670",
+    "secretary_contact": "+91-9812345671",
+    "experience": 9,
+    "rating": 4.7,
+    "consultation_timing": "11 AM - 3 PM",
+    "mr_visiting_time": "3 PM - 5 PM",
+    "languages": [
+      "Hindi",
+      "English",
+      "Marathi"
+    ],
+    "status": "available",
+    "patients_left": 0,
+    "patients_source": "mr_estimate",
+    "status_updated_at": "2026-07-09T03:19:14.320Z",
+    "status_updated_by_role": "medical_representative",
+    "status_updated_by_name": "Ravi Kumar",
+    "updateHistory": [
+      {
+        "timestamp": "2026-07-09T03:19:14.320Z",
+        "user_id": 2,
+        "user_name": "Ravi Kumar",
+        "user_email": "ravi@medconnect.com",
+        "role": "medical_representative",
+        "changes": {
+          "patients_left": {
+            "from": 1,
+            "to": 0
+          }
+        }
+      },
+      {
+        "timestamp": "2026-07-09T03:19:12.047Z",
+        "user_id": 2,
+        "user_name": "Ravi Kumar",
+        "user_email": "ravi@medconnect.com",
+        "role": "medical_representative",
+        "changes": {
+          "patients_left": {
+            "from": 2,
+            "to": 1
+          }
+        }
+      },
+      {
+        "timestamp": "2026-07-09T03:19:09.618Z",
+        "user_id": 2,
+        "user_name": "Ravi Kumar",
+        "user_email": "ravi@medconnect.com",
+        "role": "medical_representative",
+        "changes": {
+          "patients_left": {
+            "from": 1,
+            "to": 2
+          }
+        }
+      },
+      {
+        "timestamp": "2026-07-09T03:10:20.301Z",
+        "user_id": 2,
+        "user_name": "Ravi Kumar",
+        "user_email": "ravi@medconnect.com",
+        "role": "medical_representative",
+        "changes": {
+          "patients_left": {
+            "from": null,
+            "to": 1
+          }
+        }
+      }
+    ],
+    "status_updated_by_id": 2
+  },
+  {
+    "id": 3,
+    "name": "Dr. Suresh Patil",
+    "specialty": "Orthopedics",
+    "qualification": "MBBS, MS (Ortho)",
+    "hospital": "Ruby Hall Clinic, Pune",
+    "chamber_address": "Shivajinagar, Pune",
+    "phone": "+91-9898989898",
+    "secretary_contact": "+91-9898989899",
+    "experience": 20,
+    "rating": 4.3,
+    "consultation_timing": "9 AM - 1 PM",
+    "mr_visiting_time": "1 PM - 2 PM",
+    "languages": [
+      "Marathi",
+      "Hindi",
+      "English"
+    ],
+    "status": "opd_closed",
+    "patients_left": null,
+    "patients_source": null,
+    "status_updated_at": "2026-07-09T05:15:00.000Z",
+    "status_updated_by_role": "medical_representative"
+  },
+  {
+    "id": 4,
+    "name": "Dr. Kavita Reddy",
+    "specialty": "Pediatrics",
+    "qualification": "MBBS, DCH",
+    "hospital": "Rainbow Children's Hospital, Hyderabad",
+    "chamber_address": "Banjara Hills, Hyderabad",
+    "phone": "+91-9871112233",
+    "secretary_contact": "+91-9871112234",
+    "experience": 12,
+    "rating": 4.8,
+    "consultation_timing": "10 AM - 2 PM",
+    "mr_visiting_time": "2 PM - 3 PM",
+    "languages": [
+      "Telugu",
+      "Hindi",
+      "English"
+    ],
+    "status": "available",
+    "patients_left": 5,
+    "patients_source": "mr_estimate",
+    "status_updated_at": "2026-07-09T00:47:45.830Z",
+    "status_updated_by_role": "medical_representative"
+  },
+  {
+    "id": 5,
+    "name": "Dr. Amit Banerjee",
+    "specialty": "General Medicine",
+    "qualification": "MBBS, MD (Medicine)",
+    "hospital": "AMRI Hospital, Kolkata",
+    "chamber_address": "Salt Lake, Kolkata",
+    "phone": "+91-9830011223",
+    "secretary_contact": "+91-9830011224",
+    "experience": 18,
+    "rating": 4.4,
+    "consultation_timing": "6 PM - 9 PM",
+    "mr_visiting_time": "5 PM - 6 PM",
+    "languages": [
+      "Bengali",
+      "Hindi",
+      "English"
+    ],
+    "status": "available",
+    "patients_left": null,
+    "patients_source": null,
+    "status_updated_at": null,
+    "status_updated_by_role": null
+  },
+  {
+    "id": 6,
+    "name": "Dr. Neha Gupta",
+    "specialty": "Gynecology",
+    "qualification": "MBBS, MS (OBG)",
+    "hospital": "Fortis Hospital, Delhi",
+    "chamber_address": "Vasant Kunj, New Delhi",
+    "phone": "+91-9811223344",
+    "secretary_contact": "+91-9811223345",
+    "experience": 11,
+    "rating": 4.6,
+    "consultation_timing": "12 PM - 4 PM",
+    "mr_visiting_time": "4 PM - 5 PM",
+    "languages": [
+      "Hindi",
+      "English"
+    ],
+    "status": "no_mr_today",
+    "patients_left": 2,
+    "patients_source": "mr_estimate",
+    "status_updated_at": "2026-07-09T00:47:31.090Z",
+    "status_updated_by_role": "medical_representative"
+  }
+]
