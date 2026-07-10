@@ -182,7 +182,7 @@ export default function Home() {
           {[
             { name: "Rohan S.", role: "Medical Representative" },
             { name: "Dr. Priya M.", role: "Cardiologist" },
-            { name: "Ankit Pharma", role: "Recruiter" },
+            { name: "Ankit Pharma", role: "Pharma Company" },
           ].map((t) => (
             <Card key={t.name}>
               <CardContent className="p-6">

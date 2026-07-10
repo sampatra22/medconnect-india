@@ -32,7 +32,14 @@
     "name": "Cipla HR",
     "email": "hr@cipla.com",
     "password": "cipla123",
-    "role": "recruiter"
+    "role": "company"
+  },
+  {
+    "id": 7,
+    "name": "Mahesh Distributors",
+    "email": "stockist@medconnect.com",
+    "password": "stockist123",
+    "role": "stockist"
   },
   {
     "id": 6,

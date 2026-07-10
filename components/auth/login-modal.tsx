@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { signIn } from "next-auth/react"
 import { Mail, Lock, Stethoscope } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -14,14 +15,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog"
-
-const roleRedirect: Record<string, string> = {
-  admin: "/dashboard",
-  mr: "/dashboard",
-  doctor: "/dashboard",
-  chemist: "/dashboard",
-  recruiter: "/dashboard",
-}
+import { homeFor } from "@/lib/roles"
 
 export function LoginModal() {
   const router = useRouter()
@@ -44,24 +38,24 @@ export function LoginModal() {
     setLoading(true)
 
     try {
-      const res = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      })
+      const res = await signIn("credentials", { email, password, redirect: false })
 
-      const data = await res.json()
-
-      if (!res.ok) {
-        setError(data.error || "Login failed")
+      if (!res || res.error) {
+        setError("Invalid email or password")
         setLoading(false)
         return
       }
 
-      localStorage.setItem("medconnect_user", JSON.stringify(data.user))
+      const session = await fetch("/api/auth/session")
+        .then((r) => r.json())
+        .catch(() => null)
+      const role = String(session?.user?.role || "").toLowerCase()
+
       setOpen(false)
       resetForm()
-      router.push(roleRedirect[data.user.role] ?? "/dashboard")
+      // Landing page per role comes from the central config in lib/roles.ts
+      router.push(homeFor(role))
+      router.refresh()
     } catch {
       setError("Something went wrong. Please try again.")
       setLoading(false)

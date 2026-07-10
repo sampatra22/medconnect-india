@@ -1,34 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/authz";
+import { ROLE_TO_UI } from "@/lib/roles";
 
-const usersFile = path.join(process.cwd(), "data", "users.json");
-
-// Public-safe profile lookup. Never return the password field.
-// Used to verify that a name credited in an audit trail belongs to a
-// real, currently-registered account rather than a spoofed/anonymous entry.
+// Profile lookup for audit-trail verification. Signed-in users only.
+// Never returns the password field.
 export async function GET(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  const users = JSON.parse(fs.readFileSync(usersFile, "utf-8"));
-  const user = users.find((u: any) => String(u.id) === String(id));
+  const { user, response } = await requireUser();
+  if (!user) return response;
 
-  if (!user) {
+  const { id } = await params;
+  const found = await prisma.user.findUnique({
+    where: { id },
+    select: { id: true, name: true, email: true, role: true },
+  });
+
+  if (!found) {
     return NextResponse.json(
       { verified: false, error: "No account found with this ID." },
       { status: 404 }
     );
   }
-
   return NextResponse.json({
     verified: true,
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-    },
+    user: { ...found, role: ROLE_TO_UI[found.role] },
   });
 }

@@ -1,31 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 
 export default function Dashboard() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const { data: session, status } = useSession();
+  const user = session?.user as
+    | { name?: string | null; email?: string | null; role?: string }
+    | undefined;
 
   useEffect(() => {
-    const stored = localStorage.getItem("medconnect_user");
-    if (!stored) {
-      router.push("/login");
-      return;
-    }
-    setUser(JSON.parse(stored));
-  }, []);
+    if (status === "unauthenticated") router.push("/login");
+    else if (user?.role === "mr") router.replace("/dashboard/mr");
+  }, [status, user?.role, router]);
 
-  if (!user) return null;
+  if (status !== "authenticated" || !user || user.role === "mr") return null;
 
   return (
     <div className="min-h-screen bg-blue-50 flex items-center justify-center px-4 py-10">
       <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md text-center">
         <div className="text-4xl mb-4">✅</div>
-        <h1 className="text-2xl font-bold text-blue-700 mb-2">
-          Login Successful!
-        </h1>
+        <h1 className="text-2xl font-bold text-blue-700 mb-2">Login Successful!</h1>
         <p className="text-gray-500 mb-4">Welcome back,</p>
         <p className="text-xl font-bold text-gray-800">{user.name}</p>
         <p className="text-sm text-gray-500 mt-1">{user.email}</p>
@@ -54,10 +52,7 @@ export default function Dashboard() {
         </div>
 
         <button
-          onClick={() => {
-            localStorage.removeItem("medconnect_user");
-            router.push("/login");
-          }}
+          onClick={() => signOut({ callbackUrl: "/login" })}
           className="mt-6 w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-2 rounded-lg transition"
         >
           Log Out

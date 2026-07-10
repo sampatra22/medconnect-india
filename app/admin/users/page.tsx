@@ -1,15 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { signOut } from "next-auth/react";
+import { ALL_UI_ROLES } from "@/lib/roles";
 
-const ROLES = ["admin", "mr", "doctor", "chemist", "recruiter", "company"];
+const ROLES = ALL_UI_ROLES;
 
 type User = {
-  id: number;
+  id: string;
   name: string;
   email: string;
-  password: string;
   role: string;
+  created_at?: string;
 };
 
 export default function AdminUsersPage() {
@@ -18,16 +20,20 @@ export default function AdminUsersPage() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Load users on page load
   useEffect(() => {
     fetch("/api/admin/users")
       .then((r) => r.json())
       .then((data) => setUsers(data.users || []));
   }, []);
 
+  function flash(msg: string) {
+    setMessage(msg);
+    setTimeout(() => setMessage(""), 3000);
+  }
+
   async function addUser() {
     if (!form.name || !form.email || !form.password) {
-      setMessage("❌ Please fill all fields!");
+      flash("❌ Please fill all fields!");
       return;
     }
     setLoading(true);
@@ -41,14 +47,14 @@ export default function AdminUsersPage() {
     if (res.ok) {
       setUsers(data.users);
       setForm({ name: "", email: "", password: "", role: "mr" });
-      setMessage("✅ User added and saved successfully!");
+      flash("✅ User added! Their password is stored securely (hashed).");
     } else {
-      setMessage("❌ " + data.error);
+      flash("❌ " + data.error);
     }
-    setTimeout(() => setMessage(""), 3000);
   }
 
-  async function deleteUser(id: number) {
+  async function deleteUser(id: string) {
+    if (!confirm("Delete this user account?")) return;
     const res = await fetch("/api/admin/users", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
@@ -57,24 +63,40 @@ export default function AdminUsersPage() {
     const data = await res.json();
     if (res.ok) {
       setUsers(data.users);
-      setMessage("✅ User deleted!");
-      setTimeout(() => setMessage(""), 3000);
+      flash("✅ User deleted!");
+    } else {
+      flash("❌ " + (data.error || "Could not delete user."));
     }
   }
 
   return (
     <div className="min-h-screen bg-blue-50 p-6">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-2xl font-bold text-blue-700 mb-1">MedConnect India</h1>
-        <p className="text-gray-500 text-sm mb-6">Admin — User Manager</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-blue-700 mb-1">MedConnect India</h1>
+            <p className="text-gray-500 text-sm mb-6">Admin — User Manager</p>
+          </div>
+          <button
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 bg-white"
+          >
+            Log out
+          </button>
+        </div>
 
         {message && (
-          <div className={`mb-4 px-4 py-3 rounded-lg text-sm font-medium ${message.startsWith("✅") ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+          <div
+            className={`mb-4 px-4 py-3 rounded-lg text-sm font-medium ${
+              message.startsWith("✅")
+                ? "bg-green-50 text-green-700 border border-green-200"
+                : "bg-red-50 text-red-700 border border-red-200"
+            }`}
+          >
             {message}
           </div>
         )}
 
-        {/* Add User Form */}
         <div className="bg-white rounded-2xl shadow p-6 mb-6">
           <h2 className="text-lg font-bold text-gray-800 mb-4">➕ Add New User</h2>
           <div className="grid grid-cols-2 gap-4">
@@ -101,10 +123,11 @@ export default function AdminUsersPage() {
             <div>
               <label className="text-sm font-medium text-gray-700">Password</label>
               <input
-                type="text"
+                type="password"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
-                placeholder="e.g. rajesh123"
+                placeholder="Min 8 characters"
+                minLength={8}
                 className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -116,7 +139,9 @@ export default function AdminUsersPage() {
                 className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {ROLES.map((r) => (
-                  <option key={r} value={r}>{r.toUpperCase()}</option>
+                  <option key={r} value={r}>
+                    {r.replace("_", " ").toUpperCase()}
+                  </option>
                 ))}
               </select>
             </div>
@@ -130,17 +155,16 @@ export default function AdminUsersPage() {
           </button>
         </div>
 
-        {/* User Table */}
         <div className="bg-white rounded-2xl shadow p-6">
-          <h2 className="text-lg font-bold text-gray-800 mb-4">👥 User Table ({users.length} users)</h2>
+          <h2 className="text-lg font-bold text-gray-800 mb-4">
+            👥 User Table ({users.length} users)
+          </h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-blue-50 text-left">
-                  <th className="px-4 py-2">ID</th>
                   <th className="px-4 py-2">Name</th>
                   <th className="px-4 py-2">Email</th>
-                  <th className="px-4 py-2">Password</th>
                   <th className="px-4 py-2">Role</th>
                   <th className="px-4 py-2">Action</th>
                 </tr>
@@ -148,10 +172,8 @@ export default function AdminUsersPage() {
               <tbody>
                 {users.map((u) => (
                   <tr key={u.id} className="border-t border-gray-100">
-                    <td className="px-4 py-3 text-gray-400">{u.id}</td>
                     <td className="px-4 py-3 font-medium text-gray-800">{u.name}</td>
                     <td className="px-4 py-3 text-gray-600">{u.email}</td>
-                    <td className="px-4 py-3 text-gray-400">{u.password}</td>
                     <td className="px-4 py-3">
                       <span className="bg-blue-100 text-blue-700 font-semibold px-3 py-1 rounded-full text-xs uppercase">
                         {u.role}

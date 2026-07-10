@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "windows", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -12,8 +13,8 @@ enum Role {
   DOCTOR
   CLINIC_STAFF
   CHEMIST
+  STOCKIST
   PHARMA_COMPANY
-  RECRUITER
   ADMIN
 }
 
@@ -28,25 +29,47 @@ model User {
 }
 
 model Doctor {
-  id                 String   @id @default(cuid())
-  name               String
-  specialty          String
-  qualification      String
-  hospital           String
-  chamberAddress     String
-  latitude           Float?
-  longitude          Float?
-  consultationTiming String
-  mrVisitingTime     String?
-  phone              String
-  secretaryContact   String?
-  languages          String
-  experience         Int
-  rating             Float    @default(0)
-  status             String   @default("Available")
-  visits             Visit[]
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                  String         @id @default(cuid())
+  name                String
+  specialty           String
+  qualification       String
+  hospital            String
+  chamberAddress      String
+  latitude            Float?
+  longitude           Float?
+  consultationTiming  String
+  mrVisitingTime      String?
+  phone               String
+  secretaryContact    String?
+  languages           String
+  experience          Int
+  rating              Float          @default(0)
+  status              String         @default("available")
+  patientsLeft        Int?
+  patientsSource      String?
+  statusUpdatedAt     DateTime?
+  statusUpdatedById   String?
+  statusUpdatedByName String?
+  statusUpdatedByRole String?
+  visits              Visit[]
+  updates             DoctorUpdate[]
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+}
+
+// Audit trail: every status / patient-count edit, linked to a real account.
+model DoctorUpdate {
+  id        String   @id @default(cuid())
+  doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  doctorId  String
+  userId    String?
+  userName  String?
+  userEmail String?
+  role      String?
+  changes   Json
+  createdAt DateTime @default(now())
+
+  @@index([doctorId])
 }
 
 model Visit {
@@ -57,7 +80,9 @@ model Visit {
   time      String // e.g. "4:30 PM"
   status    String   @default("Visit Done")
   notes     String?
-  mrEmail   String? // which MR logged it (optional for now)
+  mrId      String?
+  mrName    String?
+  mrEmail   String?
   createdAt DateTime @default(now())
 
   @@index([date])

@@ -1,97 +1,89 @@
-import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/authz";
+import { serializeDoctor } from "@/lib/serialize";
+import { rolesWith } from "@/lib/roles";
 
-const doctorsFile = path.join(process.cwd(), "data", "doctors.json");
-
-const VALID_STATUSES = ["available", "no_mr_today", "opd_closed"];
-const ALLOWED_ROLES = ["doctor", "clinic_staff", "mr", "admin"];
-
-const MAX_HISTORY = 30;
+const STATUSES = ["available", "busy", "holiday", "no_mr_today", "token_full", "opd_closed"];
+// Role lists come from the central config in lib/roles.ts — never hard-code them.
+const CAN_SET_STATUS = rolesWith("set_doctor_status");
+const CAN_SET_PATIENTS = rolesWith("set_patient_count");
 
 export async function PUT(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  request: Request,
+  context: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  const body = await req.json();
-  const { status, patients_left, role, userId, userName, userEmail } = body;
+  // Identity comes from the session — never from the request body.
+  const { user, response } = await requireUser(CAN_SET_STATUS);
+  if (!user) return response;
 
-  // Must be logged in with an allowed role
-  if (!role || !ALLOWED_ROLES.includes(role)) {
-    return NextResponse.json(
-      { error: "You must be logged in as a doctor, clinic staff, MR, or admin to update status." },
-      { status: 403 }
-    );
-  }
+  const { id } = await context.params;
+  const b = await request.json().catch(() => ({} as Record<string, unknown>));
 
-  // Every edit must be attributable to a real logged-in account, not just a role.
-  if (!userId || !userName) {
-    return NextResponse.json(
-      { error: "Could not identify your account. Please log in again." },
-      { status: 403 }
-    );
-  }
-
-  if (status !== undefined && !VALID_STATUSES.includes(status)) {
-    return NextResponse.json({ error: "Invalid status value." }, { status: 400 });
-  }
-
-  // Doctors can update status only — not patient counts
-  if (role === "doctor" && patients_left !== undefined) {
-    return NextResponse.json(
-      { error: "Doctors can update status only, not patient counts." },
-      { status: 403 }
-    );
-  }
-
-  const doctors = JSON.parse(fs.readFileSync(doctorsFile, "utf-8"));
-  const doctor = doctors.find((d: any) => String(d.id) === String(id));
-
+  const doctor = await prisma.doctor.findUnique({ where: { id } });
   if (!doctor) {
     return NextResponse.json({ error: "Doctor not found." }, { status: 404 });
   }
 
-  const changes: Record<string, { from: unknown; to: unknown }> = {};
+  const changes: Record<string, { from: string | number | null; to: string | number | null }> = {};
+  const data: Record<string, unknown> = {};
 
-  if (status !== undefined && status !== doctor.status) {
-    changes.status = { from: doctor.status, to: status };
-    doctor.status = status;
-  }
-
-  if (patients_left !== undefined) {
-    const nextValue =
-      patients_left === null ? null : Math.max(0, parseInt(patients_left, 10) || 0);
-    if (nextValue !== doctor.patients_left) {
-      changes.patients_left = { from: doctor.patients_left, to: nextValue };
+  if (b.status !== undefined) {
+    if (typeof b.status !== "string" || !STATUSES.includes(b.status)) {
+      return NextResponse.json({ error: "Invalid status." }, { status: 400 });
     }
-    doctor.patients_left = nextValue;
-    doctor.patients_source =
-      patients_left === null ? null : role === "mr" ? "mr_estimate" : "clinic_staff";
+    if (b.status !== doctor.status) {
+      changes.status = { from: doctor.status, to: b.status };
+      data.status = b.status;
+    }
   }
 
-  const now = new Date().toISOString();
-  const displayRole = role === "mr" ? "medical_representative" : role;
-
-  doctor.status_updated_at = now;
-  doctor.status_updated_by_role = displayRole;
-  doctor.status_updated_by_name = userName;
-  doctor.status_updated_by_id = userId;
-
-  // Only log an audit entry when something actually changed.
-  if (Object.keys(changes).length > 0) {
-    const entry = {
-      timestamp: now,
-      user_id: userId,
-      user_name: userName,
-      user_email: userEmail ?? null,
-      role: displayRole,
-      changes,
-    };
-    doctor.updateHistory = [entry, ...(doctor.updateHistory ?? [])].slice(0, MAX_HISTORY);
+  if (b.patients_left !== undefined) {
+    if (!CAN_SET_PATIENTS.includes(user.role)) {
+      return NextResponse.json(
+        { error: "Only MRs, clinic staff or admins can update patient counts." },
+        { status: 403 }
+      );
+    }
+    const n =
+      b.patients_left === null ? null : Math.max(0, Math.trunc(Number(b.patients_left)));
+    if (n !== null && !Number.isFinite(n)) {
+      return NextResponse.json({ error: "Invalid patient count." }, { status: 400 });
+    }
+    if (n !== doctor.patientsLeft) {
+      changes.patients_left = { from: doctor.patientsLeft, to: n };
+      data.patientsLeft = n;
+      data.patientsSource = user.role === "mr" ? "mr_estimate" : "clinic_staff";
+    }
   }
 
-  fs.writeFileSync(doctorsFile, JSON.stringify(doctors, null, 2));
+  if (Object.keys(changes).length === 0) {
+    const fresh = await prisma.doctor.findUnique({
+      where: { id },
+      include: { updates: { orderBy: { createdAt: "desc" }, take: 20 } },
+    });
+    return NextResponse.json({ doctor: serializeDoctor(fresh!) });
+  }
 
-  return NextResponse.json({ success: true, doctor });
+  const updated = await prisma.doctor.update({
+    where: { id },
+    data: {
+      ...data,
+      statusUpdatedAt: new Date(),
+      statusUpdatedById: user.id,
+      statusUpdatedByName: user.name ?? null,
+      statusUpdatedByRole: user.role,
+      updates: {
+        create: {
+          userId: user.id,
+          userName: user.name ?? null,
+          userEmail: user.email ?? null,
+          role: user.role,
+          changes,
+        },
+      },
+    },
+    include: { updates: { orderBy: { createdAt: "desc" }, take: 20 } },
+  });
+  return NextResponse.json({ doctor: serializeDoctor(updated) });
 }

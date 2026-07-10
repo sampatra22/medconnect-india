@@ -4,7 +4,7 @@ Generated 2026-07-08 from site copy (landing page, app screens, footer). Source:
 
 ## Brand Overview
 
-MedConnect India connects India's pharmaceutical ecosystem — medical representatives (MRs), doctors, chemists, recruiters, and pharma companies — on one platform. Core promise: *"Find doctors in real time, discover jobs, track visits, and grow your pharma career — all in one place."*
+MedConnect India connects India's pharmaceutical ecosystem — medical representatives (MRs), doctors, clinic staff, chemists, stockists, and pharma companies — on one platform. Core promise: *"Find doctors in real time, discover jobs, track visits, and grow your pharma career — all in one place."*
 
 Positioning line: **"India's Pharma Ecosystem, Connected."**
 
@@ -13,7 +13,7 @@ Positioning line: **"India's Pharma Ecosystem, Connected."**
 | We Are | We Are Not |
 |---|---|
 | Practical and outcome-focused ("plan visits", "track targets") | Abstract or visionary ("revolutionizing healthcare") |
-| Warm and inclusive — every role named explicitly (MRs, doctors, chemists, recruiters) | Corporate-distant or jargon-heavy |
+| Warm and inclusive — every role named explicitly (MRs, doctors, chemists, stockists) | Corporate-distant or jargon-heavy |
 | Confident, backed by numbers (12,000+ doctors, 8,500+ MRs) | Boastful or superlative-stuffed ("the best", "world-class") |
 | Plain-spoken Indian English, India-first context (CDSCO, territories, Sun Pharma, Cipla) | Generic global-SaaS voice with US-centric references |
 | Energetic but grounded — light emoji use in-product (👋 ✅) | Flippant or meme-driven |
@@ -27,7 +27,7 @@ Positioning line: **"India's Pharma Ecosystem, Connected."**
 
 ## Terminology
 
-Preferred: MRs (medical representatives), doctors, chemists, pharma companies/partners, territory, visits, targets, doctor directory, job portal, learning center.
+Preferred: MRs (medical representatives), doctors, chemists, stockists, pharma companies/partners, territory, visits, targets, doctor directory, vacancies, learning center.
 Avoid: "users" in outward copy when a specific role fits; "healthcare professionals" as a catch-all; Western terms like "pharmacy reps" or "detailers."
 Always: "MedConnect India" in full on first mention; India spelled out, never abbreviated in brand contexts.
 
@@ -37,7 +37,7 @@ Always: "MedConnect India" in full on first mention; India spelled out, never ab
 |---|---|---|---|
 | Landing/marketing pages | Medium | High | Short benefit-led headlines, concrete stats, role-specific CTAs |
 | In-app UI copy | Low-medium | Warm | Brief, friendly, sparing emoji ("Welcome, {name} 👋") |
-| Job/recruiter content | Medium-high | Moderate | Precise about territory, role, requirements |
+| Job/vacancy content | Medium-high | Moderate | Precise about territory, role, requirements |
 | Medical news | High | Low | Factual, regulator-accurate (CDSCO), no hype |
 | Support/error messages | Medium | Calm | Plain instructions, no blame |
 

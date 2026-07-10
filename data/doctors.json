@@ -16,13 +16,26 @@
       "Hindi",
       "English"
     ],
-    "status": "available",
+    "status": "no_mr_today",
     "patients_left": 3,
     "patients_source": "mr_estimate",
-    "status_updated_at": "2026-07-09T03:20:05.440Z",
+    "status_updated_at": "2026-07-09T20:36:31.139Z",
     "status_updated_by_role": "medical_representative",
-    "status_updated_by_name": "test mr",
+    "status_updated_by_name": "Test MR",
     "updateHistory": [
+      {
+        "timestamp": "2026-07-09T20:36:31.139Z",
+        "user_id": null,
+        "user_name": "Test MR",
+        "user_email": "testmr@gmail.com",
+        "role": "medical_representative",
+        "changes": {
+          "status": {
+            "from": "available",
+            "to": "no_mr_today"
+          }
+        }
+      },
       {
         "timestamp": "2026-07-09T03:20:05.440Z",
         "user_id": "1783462566532",
@@ -89,7 +102,7 @@
         }
       }
     ],
-    "status_updated_by_id": "1783462566532"
+    "status_updated_by_id": null
   },
   {
     "id": 2,
@@ -109,13 +122,26 @@
       "English",
       "Marathi"
     ],
-    "status": "available",
+    "status": "no_mr_today",
     "patients_left": 0,
     "patients_source": "mr_estimate",
-    "status_updated_at": "2026-07-09T03:19:14.320Z",
+    "status_updated_at": "2026-07-09T20:45:55.033Z",
     "status_updated_by_role": "medical_representative",
-    "status_updated_by_name": "Ravi Kumar",
+    "status_updated_by_name": "sam",
     "updateHistory": [
+      {
+        "timestamp": "2026-07-09T20:45:55.033Z",
+        "user_id": null,
+        "user_name": "sam",
+        "user_email": null,
+        "role": "medical_representative",
+        "changes": {
+          "status": {
+            "from": "available",
+            "to": "no_mr_today"
+          }
+        }
+      },
       {
         "timestamp": "2026-07-09T03:19:14.320Z",
         "user_id": 2,
@@ -169,7 +195,7 @@
         }
       }
     ],
-    "status_updated_by_id": 2
+    "status_updated_by_id": null
   },
   {
     "id": 3,
@@ -189,11 +215,28 @@
       "Hindi",
       "English"
     ],
-    "status": "opd_closed",
+    "status": "no_mr_today",
     "patients_left": null,
     "patients_source": null,
-    "status_updated_at": "2026-07-09T05:15:00.000Z",
-    "status_updated_by_role": "medical_representative"
+    "status_updated_at": "2026-07-09T20:45:40.217Z",
+    "status_updated_by_role": "medical_representative",
+    "status_updated_by_name": "sam",
+    "status_updated_by_id": null,
+    "updateHistory": [
+      {
+        "timestamp": "2026-07-09T20:45:40.217Z",
+        "user_id": null,
+        "user_name": "sam",
+        "user_email": null,
+        "role": "medical_representative",
+        "changes": {
+          "status": {
+            "from": "opd_closed",
+            "to": "no_mr_today"
+          }
+        }
+      }
+    ]
   },
   {
     "id": 4,
@@ -237,11 +280,28 @@
       "Hindi",
       "English"
     ],
-    "status": "available",
+    "status": "no_mr_today",
     "patients_left": null,
     "patients_source": null,
-    "status_updated_at": null,
-    "status_updated_by_role": null
+    "status_updated_at": "2026-07-09T20:45:38.420Z",
+    "status_updated_by_role": "medical_representative",
+    "status_updated_by_name": "sam",
+    "status_updated_by_id": null,
+    "updateHistory": [
+      {
+        "timestamp": "2026-07-09T20:45:38.420Z",
+        "user_id": null,
+        "user_name": "sam",
+        "user_email": null,
+        "role": "medical_representative",
+        "changes": {
+          "status": {
+            "from": "available",
+            "to": "no_mr_today"
+          }
+        }
+      }
+    ]
   },
   {
     "id": 6,
@@ -263,7 +323,24 @@
     "status": "no_mr_today",
     "patients_left": 2,
     "patients_source": "mr_estimate",
-    "status_updated_at": "2026-07-09T00:47:31.090Z",
-    "status_updated_by_role": "medical_representative"
+    "status_updated_at": "2026-07-09T20:45:39.393Z",
+    "status_updated_by_role": "medical_representative",
+    "status_updated_by_name": "sam",
+    "status_updated_by_id": null,
+    "updateHistory": [
+      {
+        "timestamp": "2026-07-09T20:45:39.393Z",
+        "user_id": null,
+        "user_name": "sam",
+        "user_email": null,
+        "role": "medical_representative",
+        "changes": {
+          "status": {
+            "from": "no_mr_today",
+            "to": "no_mr_today"
+          }
+        }
+      }
+    ]
   }
 ]

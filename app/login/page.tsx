@@ -2,50 +2,47 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail]       = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError]       = useState("");
-  const [loading, setLoading]   = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  async function handleLogin() {
+  async function handleLogin(e?: React.FormEvent) {
+    e?.preventDefault();
     setError("");
     setLoading(true);
 
+    const res = await signIn("credentials", { email, password, redirect: false });
 
-    const res = await fetch("/api/login", {      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-
-    const data = await res.json();
-    setLoading(false);
-
-    if (!res.ok) {
-      setError(data.error || "Login failed");
+    if (!res || res.error) {
+      setLoading(false);
+      setError("Invalid email or password");
       return;
     }
 
-    // Save user to localStorage
-    localStorage.setItem("medconnect_user", JSON.stringify(data.user));
+    // Read the fresh session to route by role
+    const session = await fetch("/api/auth/session")
+      .then((r) => r.json())
+      .catch(() => null);
+    const role = String(session?.user?.role || "").toLowerCase();
 
-    // Redirect based on role
-    const roleRedirect: Record<string, string> = {
-  admin:     "/dashboard",
-  mr:        "/dashboard",
-  doctor:    "/dashboard",
-  chemist:   "/dashboard",
-  recruiter: "/dashboard",
-};
-
-    router.push(roleRedirect[data.user.role] ?? "/dashboard");
+    setLoading(false);
+    if (role === "mr") router.push("/dashboard/mr");
+    else if (role === "admin") router.push("/admin/users");
+    else router.push("/dashboard");
+    router.refresh();
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-blue-50">
-      <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md">
+      <form
+        onSubmit={handleLogin}
+        className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md"
+      >
         <h1 className="text-2xl font-bold text-blue-700 mb-2">MedConnect India</h1>
         <p className="text-gray-500 mb-6 text-sm">Sign in to your account</p>
 
@@ -62,6 +59,7 @@ export default function LoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@medconnect.com"
+            required
             className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
@@ -73,26 +71,26 @@ export default function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
+            required
             className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
         <button
-          onClick={handleLogin}
+          type="submit"
           disabled={loading}
           className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg transition disabled:opacity-50"
         >
           {loading ? "Signing in…" : "Sign In"}
         </button>
 
-        {/* Test credentials hint */}
-        <div className="mt-6 bg-gray-50 rounded-lg p-4 text-xs text-gray-500">
-          <p className="font-semibold mb-1 text-gray-600">Test credentials:</p>
-          <p>sam@medconnect.com / sam123 (Admin)</p>
-          <p>ravi@medconnect.com / ravi123 (MR)</p>
-          <p>anjali@medconnect.com / anjali123 (Doctor)</p>
-        </div>
-      </div>
+        <p className="text-sm text-gray-500 text-center mt-4">
+          New MR?{" "}
+          <a href="/signup" className="text-blue-600 hover:underline">
+            Create an account
+          </a>
+        </p>
+      </form>
     </div>
   );
 }

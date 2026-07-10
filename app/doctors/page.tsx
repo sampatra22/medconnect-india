@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import { EditorProfile } from "@/components/auth/editor-profile";
 
 type HistoryEntry = {
@@ -108,9 +109,11 @@ export default function DoctorsPage() {
   const [city, setCity] = useState("all");
   const [specialty, setSpecialty] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [user, setUser] = useState<User | null>(null);
   const [updatingId, setUpdatingId] = useState<Doctor["id"] | null>(null);
   const [historyOpenId, setHistoryOpenId] = useState<Doctor["id"] | null>(null);
+
+  const { data: session } = useSession();
+  const user = (session?.user as User | undefined) ?? null;
 
   const canUpdateStatus =
     user && ["mr", "admin", "doctor", "clinic_staff"].includes(user.role);
@@ -124,8 +127,6 @@ export default function DoctorsPage() {
   }
 
   useEffect(() => {
-    const stored = localStorage.getItem("medconnect_user");
-    if (stored) setUser(JSON.parse(stored));
     loadDoctors();
   }, []);
 
@@ -138,13 +139,7 @@ export default function DoctorsPage() {
     const res = await fetch(`/api/doctors/${id}/status`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...changes,
-        role: user.role,
-        userId: user.id,
-        userName: user.name,
-        userEmail: user.email,
-      }),
+      body: JSON.stringify(changes),
     });
     if (res.ok) {
       const { doctor } = await res.json();
