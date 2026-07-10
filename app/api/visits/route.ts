@@ -107,6 +107,11 @@ export async function POST(request: NextRequest) {
         },
       },
     }),
+    // Keep the daily plan in sync: if this doctor is on today's plan, tick it.
+    prisma.planItem.updateMany({
+      where: { mrId: user.id, date, doctorId, status: { not: "done" } },
+      data: { status: "done" },
+    }),
   ]);
 
   return NextResponse.json(serializeVisit(visit), { status: 201 });

@@ -1,4 +1,4 @@
-import type { Doctor, DoctorUpdate, Visit } from "@prisma/client";
+import type { Doctor, DoctorUpdate, PlanItem, Visit } from "@prisma/client";
 
 // Keeps the JSON shape the frontend already understands (snake_case).
 export function serializeDoctor(d: Doctor & { updates?: DoctorUpdate[] }) {
@@ -33,6 +33,17 @@ export function serializeDoctor(d: Doctor & { updates?: DoctorUpdate[] }) {
       role: u.role,
       changes: u.changes as Record<string, { from: unknown; to: unknown }>,
     })),
+  };
+}
+
+export function serializePlanItem(p: PlanItem & { doctor?: Doctor | null }) {
+  return {
+    id: p.id,
+    date: p.date,
+    order: p.order,
+    planned_time: p.plannedTime,
+    status: p.status,
+    doctor: p.doctor ? serializeDoctor(p.doctor) : null,
   };
 }
 

@@ -32,7 +32,7 @@ model Doctor {
   id                  String         @id @default(cuid())
   name                String
   specialty           String
-  qualification       String
+  qualification      String
   hospital            String
   chamberAddress      String
   latitude            Float?
@@ -53,8 +53,26 @@ model Doctor {
   statusUpdatedByRole String?
   visits              Visit[]
   updates             DoctorUpdate[]
+  planItems           PlanItem[]
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
+}
+
+// An MR's ordered visit checklist for one day. "Rearrange planning" = order.
+model PlanItem {
+  id          String   @id @default(cuid())
+  mrId        String
+  date        String // plan day, "YYYY-MM-DD" (IST)
+  doctor      Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  doctorId    String
+  order       Int      @default(0)
+  plannedTime String? // e.g. "4:30 PM"
+  status      String   @default("planned") // planned | done | skipped
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([mrId, date, doctorId])
+  @@index([mrId, date])
 }
 
 // Audit trail: every status / patient-count edit, linked to a real account.
