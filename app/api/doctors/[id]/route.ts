@@ -2,11 +2,13 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/authz";
 
+// Deleting a doctor wipes their visit history and audit trail (cascade),
+// so it is ADMIN-ONLY. MRs manage their own list via /api/my-doctors instead.
 export async function DELETE(
   _request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  const { user, response } = await requireUser(["mr", "admin"]);
+  const { user, response } = await requireUser(["admin"]);
   if (!user) return response;
 
   const { id } = await context.params;

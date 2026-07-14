@@ -13,6 +13,16 @@ type HistoryEntry = {
   changes: Record<string, { from: unknown; to: unknown }>;
 };
 
+type DayPlanItem = { id: string; time: string; activity: string; done: boolean };
+
+type TodayPlan = {
+  date: string;
+  items: DayPlanItem[];
+  shared: boolean;
+  started_at: string | null;
+  updated_at: string;
+};
+
 type Doctor = {
   id: number | string;
   name: string;
@@ -26,8 +36,11 @@ type Doctor = {
   rating: number;
   consultation_timing: string;
   mr_visiting_time: string;
+  mr_visiting_days?: string | null;
+  timetable?: Record<string, string> | null;
+  today_plan?: TodayPlan | null;
   languages: string[];
-  status: "available" | "no_mr_today" | "opd_closed";
+  status: "available" | "busy" | "holiday" | "no_mr_today" | "token_full" | "opd_closed";
   patients_left: number | null;
   patients_source: "clinic_staff" | "mr_estimate" | null;
   status_updated_at: string | null;
@@ -35,6 +48,10 @@ type Doctor = {
   status_updated_by_name?: string | null;
   status_updated_by_id?: string | number | null;
   updateHistory?: HistoryEntry[];
+  // Module 6: attribution + verification state
+  verified?: boolean;
+  added_by_name?: string | null;
+  added_by_role?: string | null;
 };
 
 type User = { id: string | number; name: string; email: string; role: string };
@@ -48,16 +65,38 @@ const STATUS_CONFIG: Record<
     classes: "bg-green-100 text-green-700",
     dot: "bg-green-500",
   },
+  busy: {
+    label: "Busy",
+    classes: "bg-orange-100 text-orange-700",
+    dot: "bg-orange-500",
+  },
+  token_full: {
+    label: "Token Full",
+    classes: "bg-purple-100 text-purple-700",
+    dot: "bg-purple-500",
+  },
   no_mr_today: {
     label: "No MR Today",
     classes: "bg-yellow-100 text-yellow-700",
     dot: "bg-yellow-500",
+  },
+  holiday: {
+    label: "Holiday",
+    classes: "bg-sky-100 text-sky-700",
+    dot: "bg-sky-500",
   },
   opd_closed: {
     label: "OPD Closed",
     classes: "bg-red-100 text-red-700",
     dot: "bg-red-500",
   },
+};
+
+// Never let an unexpected status value crash the public page.
+const STATUS_FALLBACK = {
+  label: "Unknown",
+  classes: "bg-gray-100 text-gray-600",
+  dot: "bg-gray-400",
 };
 
 const ROLE_LABEL: Record<string, string> = {
@@ -80,9 +119,20 @@ function formatValue(field: string, value: unknown): string {
   return value === null || value === undefined ? "—" : String(value);
 }
 
+const CHANGE_LABEL: Record<string, string> = {
+  status: "Status",
+  patients_left: "Patients left",
+  timetable: "Weekly timetable",
+  day_plan: "Day plan",
+  day_started: "Day started",
+  profile_claimed: "Profile claimed",
+  doctor_added: "Doctor added",
+  verified: "Verified",
+};
+
 function describeChanges(entry: HistoryEntry): string[] {
   return Object.entries(entry.changes).map(([field, { from, to }]) => {
-    const label = field === "status" ? "Status" : "Patients left";
+    const label = CHANGE_LABEL[field] ?? field;
     return `${label}: ${formatValue(field, from)} → ${formatValue(field, to)}`;
   });
 }
@@ -102,6 +152,28 @@ function cityOf(d: Doctor): string {
   return parts[parts.length - 1].trim();
 }
 
+// ── Module 4: doctor-shared timetable & day plan helpers ──────────────────
+const DAY_ORDER = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+const DAY_SHORT: Record<string, string> = {
+  mon: "Mon", tue: "Tue", wed: "Wed", thu: "Thu", fri: "Fri", sat: "Sat", sun: "Sun",
+};
+
+function istDayKey(): string {
+  return new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Kolkata", weekday: "short" })
+    .format(new Date())
+    .toLowerCase();
+}
+
+function istClock(iso: string | null): string | null {
+  if (!iso) return null;
+  return new Date(iso).toLocaleTimeString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
 export default function DoctorsPage() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -111,6 +183,7 @@ export default function DoctorsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [updatingId, setUpdatingId] = useState<Doctor["id"] | null>(null);
   const [historyOpenId, setHistoryOpenId] = useState<Doctor["id"] | null>(null);
+  const [ttOpenId, setTtOpenId] = useState<Doctor["id"] | null>(null);
 
   const { data: session } = useSession();
   const user = (session?.user as User | undefined) ?? null;
@@ -122,12 +195,18 @@ export default function DoctorsPage() {
   async function loadDoctors() {
     setLoading(true);
     const res = await fetch("/api/doctors");
-    setDoctors(await res.json());
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) setDoctors(data);
+    }
     setLoading(false);
   }
 
   useEffect(() => {
-    loadDoctors();
+    // Async wrapper keeps setState out of the effect body (react-hooks/set-state-in-effect).
+    void (async () => {
+      await loadDoctors();
+    })();
   }, []);
 
   async function updateDoctor(
@@ -151,6 +230,21 @@ export default function DoctorsPage() {
     setUpdatingId(null);
   }
 
+  // Module 6: admin approves an MR-added profile -> visible to everyone.
+  async function verifyDoctor(d: Doctor) {
+    if (!user || user.role !== "admin") return;
+    setUpdatingId(d.id);
+    const res = await fetch(`/api/doctors/${d.id}/verify`, { method: "PUT" });
+    if (res.ok) {
+      const { doctor } = await res.json();
+      setDoctors((prev) => prev.map((x) => (x.id === doctor.id ? doctor : x)));
+    } else {
+      const e = (await res.json().catch(() => ({}))) as { error?: string };
+      alert(e.error || "Could not verify.");
+    }
+    setUpdatingId(null);
+  }
+
   const cities = Array.from(new Set(doctors.map(cityOf))).sort();
   const specialties = Array.from(new Set(doctors.map((d) => d.specialty))).sort();
 
@@ -161,6 +255,13 @@ export default function DoctorsPage() {
     if (statusFilter !== "all" && d.status !== statusFilter) return false;
     return true;
   });
+
+  // Module 4 incentive, delivered: doctors who shared today's plan rank first.
+  // Sharing → top of the directory → more patient walk-ins. (Stable sort keeps
+  // the original order within each group.)
+  const sharesToday = (d: Doctor) =>
+    d.today_plan && (d.today_plan.items.length > 0 || d.today_plan.started_at) ? 1 : 0;
+  const ranked = [...filtered].sort((a, b) => sharesToday(b) - sharesToday(a));
 
   return (
     <div className="min-h-screen bg-blue-50">
@@ -218,9 +319,9 @@ export default function DoctorsPage() {
             className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
           >
             <option value="all">All Statuses</option>
-            <option value="available">Available</option>
-            <option value="no_mr_today">No MR Today</option>
-            <option value="opd_closed">OPD Closed</option>
+            {(Object.keys(STATUS_CONFIG) as Doctor["status"][]).map((s) => (
+              <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>
+            ))}
           </select>
         </div>
 
@@ -244,23 +345,48 @@ export default function DoctorsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtered.map((d) => {
-              const sc = STATUS_CONFIG[d.status];
+            {ranked.map((d) => {
+              const sc = STATUS_CONFIG[d.status] ?? STATUS_FALLBACK;
               const updated = timeAgo(d.status_updated_at);
+              const todayHours = d.timetable?.[istDayKey()] ?? null;
               return (
                 <div key={d.id} className="bg-white rounded-2xl shadow-sm p-5 flex flex-col">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <h2 className="font-bold text-gray-800">{d.name}</h2>
+                      <h2 className="font-bold text-gray-800 flex items-center gap-1.5">
+                        <span>{d.name}</span>
+                        {d.verified === false && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 whitespace-nowrap">⏳ Pending</span>
+                        )}
+                      </h2>
                       <p className="text-sm text-blue-700 font-medium">{d.specialty}</p>
                       <p className="text-xs text-gray-500">{d.qualification}</p>
+                      {d.added_by_name ? (
+                        <p className="text-[11px] text-gray-400 mt-0.5">Added by {d.added_by_name} ({roleLabel(d.added_by_role)})</p>
+                      ) : null}
                     </div>
-                    <span
-                      className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap ${sc.classes}`}
-                    >
-                      <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
-                      {sc.label}
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span
+                        className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap ${sc.classes}`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
+                        {sc.label}
+                      </span>
+                      {user?.role === "admin" && d.verified === false && (
+                        <button
+                          onClick={() => verifyDoctor(d)}
+                          disabled={updatingId === d.id}
+                          className="text-[11px] font-bold px-2 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                          ✓ Approve
+                        </button>
+                      )}
+                      {sharesToday(d) === 1 && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 whitespace-nowrap">
+                          📋 Shares day plan
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Patients left + freshness */}
@@ -343,12 +469,90 @@ export default function DoctorsPage() {
                     <p>🏥 {d.hospital}</p>
                     <p>📍 {d.chamber_address}</p>
                     <p>🩺 OPD: {d.consultation_timing}</p>
+                    {/* Module 4: today's hours straight from the doctor's own
+                        timetable — no expanding needed to answer "when do I go?" */}
+                    {todayHours ? (
+                      <p className="font-medium text-emerald-700">
+                        🗓 Today&apos;s hours: {todayHours}
+                      </p>
+                    ) : null}
                     {user && (
                       <p className="font-medium text-gray-700">
-                        👜 MR visiting time: {d.mr_visiting_time}
+                        👜 MR visiting time: {[d.mr_visiting_days, d.mr_visiting_time].filter(Boolean).join(" · ")}
                       </p>
                     )}
                     <p>⭐ {d.rating} · {d.experience} yrs experience</p>
+
+                    {/* Module 4: the doctor's own shared plan for today —
+                        patients pick their moment, MRs cross-check status. */}
+                    {d.today_plan && (d.today_plan.items.length > 0 || d.today_plan.started_at) && (
+                      <div className="mt-2 bg-emerald-50 border border-emerald-100 rounded-xl p-3">
+                        <p className="text-xs font-bold text-emerald-800 flex items-center justify-between gap-2">
+                          <span>📋 Doctor&apos;s plan today</span>
+                          {d.today_plan.started_at && (
+                            <span className="font-semibold text-emerald-600 whitespace-nowrap">
+                              ▶ Started {istClock(d.today_plan.started_at)}
+                            </span>
+                          )}
+                        </p>
+                        {d.today_plan.items.length === 0 && (
+                          <p className="text-xs text-emerald-900 mt-1">
+                            Doctor is in — day started, plan coming up.
+                          </p>
+                        )}
+                        <ul className="mt-1.5 space-y-1">
+                          {d.today_plan.items.map((it) => (
+                            <li
+                              key={it.id}
+                              className={`text-xs flex gap-1.5 ${
+                                it.done ? "text-gray-400 line-through" : "text-emerald-900"
+                              }`}
+                            >
+                              <span className="flex-none">{it.done ? "✅" : "⏳"}</span>
+                              {it.time && (
+                                <span className="font-semibold whitespace-nowrap">{it.time}</span>
+                              )}
+                              <span className="min-w-0">{it.activity}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        <p className="text-[11px] text-emerald-600 mt-1.5">
+                          Shared by the doctor · {timeAgo(d.today_plan.updated_at)?.toLowerCase()}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Module 4: doctor's recurring weekly timetable */}
+                    {d.timetable && Object.keys(d.timetable).length > 0 && (
+                      <div className="mt-1">
+                        <button
+                          onClick={() => setTtOpenId(ttOpenId === d.id ? null : d.id)}
+                          className="text-xs text-blue-600 hover:underline"
+                        >
+                          {ttOpenId === d.id ? "Hide weekly timetable" : "🗓 View weekly timetable"}
+                        </button>
+                        {ttOpenId === d.id && (
+                          <div className="mt-1.5 bg-blue-50 rounded-xl p-3 space-y-0.5">
+                            {DAY_ORDER.map((k) => (
+                              <div
+                                key={k}
+                                className={`text-xs flex gap-2 ${
+                                  k === istDayKey()
+                                    ? "font-bold text-blue-800"
+                                    : "text-gray-600"
+                                }`}
+                              >
+                                <span className="w-9 flex-none">{DAY_SHORT[k]}</span>
+                                <span className="min-w-0">{d.timetable?.[k] || "—"}</span>
+                                {k === istDayKey() && (
+                                  <span className="text-blue-500 flex-none">← today</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Update controls */}

@@ -28,7 +28,10 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      {/* suppressHydrationWarning: browser extensions (password managers,
+          Grammarly, dark-mode) inject attributes into <body> before React
+          loads, causing a false hydration warning. This silences only that. */}
+      <body suppressHydrationWarning className="min-h-full flex flex-col">
         <SessionProvider>{children}</SessionProvider>
       </body>
     </html>

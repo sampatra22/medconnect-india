@@ -15,9 +15,11 @@ export default function Dashboard() {
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
     else if (user?.role === "mr") router.replace("/dashboard/mr");
+    else if (user?.role === "doctor") router.replace("/dashboard/doctor");
   }, [status, user?.role, router]);
 
-  if (status !== "authenticated" || !user || user.role === "mr") return null;
+  if (status !== "authenticated" || !user || user.role === "mr" || user.role === "doctor")
+    return null;
 
   return (
     <div className="min-h-screen bg-blue-50 flex items-center justify-center px-4 py-10">

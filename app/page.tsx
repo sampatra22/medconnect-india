@@ -54,7 +54,7 @@ export default function Home() {
       <section className="relative overflow-hidden bg-gradient-to-b from-blue-50 to-white dark:from-slate-900 dark:to-slate-950">
         <div className="max-w-7xl mx-auto px-6 py-20 text-center">
           <Badge className="mb-4 bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
-            India's Pharma Ecosystem, Connected
+            India&apos;s Pharma Ecosystem, Connected
           </Badge>
           <h1 className="text-4xl md:text-6xl font-bold text-slate-900 dark:text-white leading-tight">
             One Platform for MRs, Doctors
@@ -192,8 +192,8 @@ export default function Home() {
                   ))}
                 </div>
                 <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">
-                  "MedConnect India has made it so much easier to plan visits
-                  and stay on top of doctor availability."
+                  &ldquo;MedConnect India has made it so much easier to plan visits
+                  and stay on top of doctor availability.&rdquo;
                 </p>
                 <div className="flex items-center gap-3">
                   <Avatar>
@@ -245,7 +245,7 @@ export default function Home() {
               <span className="text-white font-bold">MedConnect India</span>
             </div>
             <p className="text-sm text-slate-400">
-              Connecting India's pharmaceutical ecosystem — MRs, doctors,
+              Connecting India&apos;s pharmaceutical ecosystem — MRs, doctors,
               chemists, and companies, in one place.
             </p>
           </div>

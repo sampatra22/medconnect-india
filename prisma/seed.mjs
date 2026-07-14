@@ -97,6 +97,24 @@ async function main() {
     }
   }
 
+  // Module 4: link the demo doctor account to her directory profile so the
+  // doctor dashboard works out of the box (existing DBs use the claim flow).
+  const anjaliUser = await prisma.user.findUnique({
+    where: { email: "anjali@medconnect.com" },
+  });
+  if (anjaliUser) {
+    const anjaliDoctor = await prisma.doctor.findFirst({
+      where: { name: "Dr. Anjali Mehta", userId: null },
+    });
+    if (anjaliDoctor) {
+      await prisma.doctor.update({
+        where: { id: anjaliDoctor.id },
+        data: { userId: anjaliUser.id },
+      });
+      console.log("linked Dr. Anjali Mehta profile -> anjali@medconnect.com");
+    }
+  }
+
   console.log(
     "seeded -> users:", await prisma.user.count(),
     "doctors:", await prisma.doctor.count(),

@@ -11,8 +11,11 @@ export type Permission =
   | "manage_users" // admin-only user management
   | "set_doctor_status" // update a doctor's availability (manual input only)
   | "set_patient_count" // update live patient count (clinic staff = trusted source)
+  | "share_day_plan" // Module 4: doctor's own timetable + shared day plan (ownership enforced in routes)
   | "plan_visits" // MR daily planner / visit tracker
-  | "call_mr" // direct-contact action (reveal number / phone call)
+  | "add_doctor" // create new doctor profiles in the directory (Module 6 data entry)
+  | "call_mr" // direct-contact action: request a call from an MR
+  | "receive_call_requests" // MR inbox for incoming call requests
   | "post_vacancy" // create vacancy listings
   | "view_vacancy"; // browse / check vacancy listings
 
@@ -32,8 +35,11 @@ export const ROLE_CONFIG: Record<string, RoleConfig> = {
       "manage_users",
       "set_doctor_status",
       "set_patient_count",
+      "share_day_plan",
       "plan_visits",
+      "add_doctor",
       "call_mr",
+      "receive_call_requests",
       "post_vacancy",
       "view_vacancy",
     ],
@@ -42,13 +48,20 @@ export const ROLE_CONFIG: Record<string, RoleConfig> = {
     db: "MEDICAL_REP",
     label: "Medical Representative",
     home: "/dashboard/mr",
-    permissions: ["set_doctor_status", "set_patient_count", "plan_visits", "view_vacancy"],
+    permissions: [
+      "set_doctor_status",
+      "set_patient_count",
+      "plan_visits",
+      "add_doctor",
+      "receive_call_requests",
+      "view_vacancy",
+    ],
   },
   doctor: {
     db: "DOCTOR",
     label: "Doctor",
-    home: "/dashboard",
-    permissions: ["set_doctor_status", "call_mr", "post_vacancy"],
+    home: "/dashboard/doctor",
+    permissions: ["set_doctor_status", "share_day_plan", "call_mr", "post_vacancy"],
   },
   clinic_staff: {
     db: "CLINIC_STAFF",

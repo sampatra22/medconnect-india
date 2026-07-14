@@ -24,11 +24,14 @@ function istNow() {
   return { date, time };
 }
 
-// The MR's plan for a date, in order, with live doctor status attached.
+// The MR's plan for a date, in order, with live doctor status attached
+// (+ the doctor's own shared day plan, so the MR can cross-check — Module 4).
 async function planFor(mrId: string, date: string) {
   const items = await prisma.planItem.findMany({
     where: { mrId, date },
-    include: { doctor: true },
+    include: {
+      doctor: { include: { dayPlans: { where: { date, shared: true }, take: 1 } } },
+    },
     orderBy: { order: "asc" },
   });
   return items.map(serializePlanItem);

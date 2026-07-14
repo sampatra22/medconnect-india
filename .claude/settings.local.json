@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-Process git,git-lfs -ErrorAction SilentlyContinue)"
+    ]
+  }
+}

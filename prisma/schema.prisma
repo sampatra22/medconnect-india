@@ -30,6 +30,9 @@ model User {
 
 model Doctor {
   id                  String         @id @default(cuid())
+  // Module 4: the doctor's own login account (User with role DOCTOR).
+  // Set once via the claim flow — lets the doctor edit their OWN profile only.
+  userId              String?        @unique
   name                String
   specialty           String
   qualification      String
@@ -39,6 +42,7 @@ model Doctor {
   longitude           Float?
   consultationTiming  String
   mrVisitingTime      String?
+  mrVisitingDays      String? // e.g. "Mon, Wed, Fri"
   phone               String
   secretaryContact    String?
   languages           String
@@ -51,11 +55,46 @@ model Doctor {
   statusUpdatedById   String?
   statusUpdatedByName String?
   statusUpdatedByRole String?
+  // Module 4: recurring baseline hours, edited by the doctor only.
+  // JSON object keyed by day: { "mon": "10 AM – 1 PM, 6 – 9 PM", ... }
+  weeklyTimetable     Json?
+  // Module 6: MR-sourced data entry. Every new profile records WHO added it
+  // (trust attribution) and starts unverified unless an admin created it.
+  // Unverified profiles are visible only to their creator + admins.
+  addedById           String?
+  addedByName         String?
+  addedByRole         String?
+  verified            Boolean        @default(true)
   visits              Visit[]
   updates             DoctorUpdate[]
   planItems           PlanItem[]
+  mrDoctors           MrDoctor[]
+  dayPlans            DoctorDayPlan[]
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
+
+  @@index([verified])
+}
+
+// ─── Module 4 · Doctor's own shared day plan ────────────────────────────────
+// The doctor starts their day and shares a day-wise plan / to-do list
+// (e.g. "10–1 OPD", "2–4 hospital rounds", "6–9 evening chamber").
+// Patients and MRs see it on the public directory, plan around it, and
+// cross-check the live status against it. Visibility = more patients,
+// which is what encourages the doctor to keep sharing.
+model DoctorDayPlan {
+  id        String    @id @default(cuid())
+  doctor    Doctor    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  doctorId  String
+  date      String // plan day, "YYYY-MM-DD" (IST)
+  items     Json      @default("[]") // [{ id, time, activity, done }]
+  shared    Boolean   @default(true) // doctor can keep a day private
+  startedAt DateTime? // set when the doctor taps "Start My Day"
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([doctorId, date])
+  @@index([date])
 }
 
 // An MR's ordered visit checklist for one day. "Rearrange planning" = order.
@@ -75,6 +114,41 @@ model PlanItem {
   @@index([mrId, date])
 }
 
+// ─── Phase 3 · MR Tools ──────────────────────────────────────────────────────
+
+// A doctor on an MR's personal working list (their company-assigned universe).
+// frequency = how many times per month the company expects this doctor visited
+// (e.g. core doctors 3×, others 2×). Sum of frequencies = monthly call target.
+model MrDoctor {
+  id        String   @id @default(cuid())
+  mrId      String
+  doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  doctorId  String
+  frequency Int      @default(2) // planned visits per month (1–4)
+  patch     Patch?   @relation(fields: [patchId], references: [id], onDelete: SetNull)
+  patchId   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([mrId, doctorId])
+  @@index([mrId])
+  @@index([patchId])
+}
+
+// A call patch = a named group of doctors an MR covers together in one day
+// (usually one area/route). Loading a patch fills that day's plan in one tap.
+model Patch {
+  id        String     @id @default(cuid())
+  mrId      String
+  name      String // e.g. "Patch A – Salt Lake"
+  doctors   MrDoctor[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([mrId, name])
+  @@index([mrId])
+}
+
 // Audit trail: every status / patient-count edit, linked to a real account.
 model DoctorUpdate {
   id        String   @id @default(cuid())
@@ -88,6 +162,27 @@ model DoctorUpdate {
   createdAt DateTime @default(now())
 
   @@index([doctorId])
+}
+
+// ─── Module 5 · Call MR ─────────────────────────────────────────────────────
+// A doctor (or chemist/stockist later) asks an MR to call them. Lands as a
+// notification on that MR's dashboard: who asked, when, and its state.
+// Names are denormalized (same pattern as Visit/DoctorUpdate) so the record
+// stays readable even if accounts change.
+model CallRequest {
+  id         String   @id @default(cuid())
+  mrId       String // target MR (User.id)
+  fromUserId String // requesting account (User.id)
+  fromName   String
+  fromRole   String
+  doctorId   String? // requester's Doctor profile, when linked
+  note       String?
+  status     String   @default("pending") // pending | seen | done
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([mrId, status])
+  @@index([fromUserId])
 }
 
 model Visit {

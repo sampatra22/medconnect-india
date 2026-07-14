@@ -45,10 +45,11 @@ type ProfileResult = VerifiedProfile | UnverifiedProfile
  * reflects a real, currently-registered account, not just whatever text was
  * submitted at edit time.
  */
+// `role` stays in the props type (callers still pass it) but is intentionally
+// not read — the card shows the freshly fetched role, never the stored text.
 export function EditorProfile({
   userId,
   name,
-  role,
 }: {
   userId: string | number
   name: string

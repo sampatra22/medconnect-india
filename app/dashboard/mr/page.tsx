@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 type Doctor = {
   id: number | string;
@@ -11,6 +12,7 @@ type Doctor = {
   hospital?: string;
   chamber_address?: string;
   mr_visiting_time?: string;
+  mr_visiting_days?: string;
   consultation_timing?: string;
   phone?: string;
   secretary_contact?: string;
@@ -22,6 +24,19 @@ type Doctor = {
   status_updated_at?: string | null;
   status_updated_by_role?: string | null;
   status_updated_by_name?: string | null;
+  // Module 4: doctor-shared availability layers
+  timetable?: Record<string, string> | null;
+  today_plan?: {
+    date: string;
+    items: { id: string; time: string; activity: string; done: boolean }[];
+    shared: boolean;
+    started_at: string | null;
+    updated_at: string;
+  } | null;
+  // Module 6: attribution + verification state
+  verified?: boolean;
+  added_by_name?: string | null;
+  added_by_role?: string | null;
 };
 
 type Visit = {
@@ -35,6 +50,18 @@ type Visit = {
   created_at?: string;
 };
 
+// Phase 3 · MR Tools — a doctor on the MR's personal working list.
+type MyDoctor = {
+  id: string;
+  frequency: number; // planned visits per month (1–4)
+  patch_id: string | null;
+  patch_name: string | null;
+  visits_this_month: number;
+  doctor: Doctor | null;
+};
+
+type CallPatch = { id: string; name: string; doctor_count: number };
+
 type PlanItem = {
   id: string;
   date: string;
@@ -42,6 +69,20 @@ type PlanItem = {
   planned_time?: string | null;
   status: string; // planned | done | skipped
   doctor: Doctor | null;
+};
+
+// Module 5 · Call MR — one incoming call-back request (shape from /api/call-requests).
+type CallRequest = {
+  id: string;
+  mr_id: string;
+  from_user_id: string;
+  from_name: string;
+  from_role: string;
+  doctor_id: string | null;
+  note: string | null;
+  status: string; // pending | seen | done
+  created_at: string;
+  updated_at: string;
 };
 
 const STATUS: Record<string, { label: string; cls: string }> = {
@@ -85,10 +126,12 @@ function timeAgo(iso?: string | null) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-// "Genuine status" rule: always show how fresh the status is and who set it.
+// "Genuine status" rule: always show how fresh the status is and WHO set it —
+// by name. Every MR can see who last updated, so false inputs are caught fast.
 function freshness(d?: Doctor | null) {
   if (!d?.status_updated_at) return "";
-  const by = d.status_updated_by_role ? ROLE_LABEL[d.status_updated_by_role] || d.status_updated_by_role : "";
+  const role = d.status_updated_by_role ? ROLE_LABEL[d.status_updated_by_role] || d.status_updated_by_role : "";
+  const by = d.status_updated_by_name ? `${d.status_updated_by_name}${role ? ` (${role})` : ""}` : role;
   return `${timeAgo(d.status_updated_at)}${by ? " by " + by : ""}`;
 }
 
@@ -112,19 +155,60 @@ function StatusBadge({ d, small }: { d?: Doctor | null; small?: boolean }) {
   );
 }
 
+// Module 4: marks doctors who shared their own plan today — the most reliable
+// signal an MR can route by. Hover shows the plan at a glance.
+function PlanChip({ d }: { d?: Doctor | null }) {
+  const p = d?.today_plan;
+  if (!p || (p.items.length === 0 && !p.started_at)) return null;
+  const preview = p.items
+    .map((it) => `${it.done ? "✅" : "⏳"} ${[it.time, it.activity].filter(Boolean).join(" ")}`)
+    .join("\n");
+  return (
+    <span
+      title={preview || "Doctor started their day"}
+      className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-200"
+    >
+      📋 {p.items.length > 0 ? `Plan (${p.items.length})` : "Day started"}
+    </span>
+  );
+}
+
 export default function MrDashboard() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [plan, setPlanItems] = useState<PlanItem[]>([]);
   const [monthVisits, setMonthVisits] = useState<Visit[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState<"plan" | "doctors" | "calendar">("plan");
+  const [tab, setTab] = useState<"plan" | "mylist" | "doctors" | "calendar">("plan");
+  // Phase 3 · MR Tools state
+  const [myList, setMyList] = useState<MyDoctor[]>([]);
+  const [patches, setPatches] = useState<CallPatch[]>([]);
+  const [mySearch, setMySearch] = useState("");
+  const [myPatchFilter, setMyPatchFilter] = useState(""); // "" all · "none" unassigned · patch id
+  const [showListPicker, setShowListPicker] = useState(false);
+  const [listPickerSearch, setListPickerSearch] = useState("");
+  const [showLoadPatch, setShowLoadPatch] = useState(false);
+  const [newPatch, setNewPatch] = useState("");
   const [search, setSearch] = useState("");
   const [spec, setSpec] = useState("");
   const [planFilter, setPlanFilter] = useState<"all" | "todo" | "done">("all");
   const [toast, setToast] = useState("");
-  const { data: session } = useSession();
-  const [mr, setMr] = useState<{ name: string; email: string; id: string | null }>({ name: "", email: "", id: null });
+  const router = useRouter();
+  const { data: session, status: authStatus } = useSession();
+  // Derived straight from the session — no state/effect needed (react-hooks/set-state-in-effect).
+  const mr = useMemo(() => {
+    const u = session?.user as { id?: string; name?: string | null; email?: string | null } | undefined;
+    return { name: u?.name || "", email: u?.email || "", id: u?.id ?? null };
+  }, [session]);
+
+  // Client-side backup for the proxy role gate: only MRs (and admins) belong here.
+  useEffect(() => {
+    if (authStatus === "unauthenticated") router.push("/login");
+    else if (authStatus === "authenticated") {
+      const role = (session?.user as { role?: string } | undefined)?.role;
+      if (role && role !== "mr" && role !== "admin") router.replace("/dashboard");
+    }
+  }, [authStatus, session, router]);
   const [showAdd, setShowAdd] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [pickerSearch, setPickerSearch] = useState("");
@@ -132,17 +216,21 @@ export default function MrDashboard() {
   const [form, setForm] = useState<Record<string, string>>({});
   const [calMonth, setCalMonth] = useState(new Date());
   const [selDate, setSelDate] = useState(istToday());
+  // Module 5 · Call MR — incoming call requests (doctor name + when + note)
+  const [callReqs, setCallReqs] = useState<CallRequest[]>([]);
+  const [showAllCallReqs, setShowAllCallReqs] = useState(false);
+  // Counter for optimistic temp row ids (render-safe, unlike Date.now()).
+  const tempSeq = useRef(0);
 
   const today = istToday();
-
-  useEffect(() => {
-    const u = session?.user as { id?: string; name?: string | null; email?: string | null } | undefined;
-    if (u) setMr({ name: u.name || "", email: u.email || "", id: u.id ?? null });
-  }, [session]);
+  // Directory deletion is admin-only (server-enforced too); hide the button for MRs.
+  const isAdmin = ((session?.user as { role?: string } | undefined)?.role || "") === "admin";
 
   async function loadDoctors() {
     const r = await fetch("/api/doctors", { cache: "no-store" });
-    setDoctors(await r.json());
+    if (!r.ok) return; // 401/403/500 bodies are {error} objects, never arrays
+    const data = await r.json();
+    if (Array.isArray(data)) setDoctors(data);
   }
   async function loadPlan() {
     const r = await fetch("/api/plan", { cache: "no-store" });
@@ -150,22 +238,73 @@ export default function MrDashboard() {
   }
   async function loadMonth(d: Date) {
     const r = await fetch(`/api/visits?month=${istMonthOf(d)}`, { cache: "no-store" });
-    setMonthVisits(await r.json());
+    if (!r.ok) return; // non-MR sessions get {error} JSON — never feed that to state
+    const data = await r.json();
+    if (Array.isArray(data)) setMonthVisits(data);
+  }
+  async function loadMyList() {
+    const r = await fetch("/api/my-doctors", { cache: "no-store" });
+    if (r.ok) setMyList(await r.json());
+  }
+  async function loadPatches() {
+    const r = await fetch("/api/patches", { cache: "no-store" });
+    if (r.ok) setPatches(await r.json());
+  }
+  async function loadCallReqs() {
+    const r = await fetch("/api/call-requests", { cache: "no-store" });
+    if (r.ok) setCallReqs(await r.json());
   }
   useEffect(() => {
     (async () => {
       setLoading(true);
-      await Promise.all([loadDoctors(), loadPlan(), loadMonth(new Date())]);
+      await Promise.all([loadDoctors(), loadPlan(), loadMonth(new Date()), loadMyList(), loadPatches(), loadCallReqs()]);
       setLoading(false);
     })();
   }, []);
-  useEffect(() => { loadMonth(calMonth); }, [calMonth]);
+
+  async function setCallReqStatus(id: string, status: "seen" | "done") {
+    const r = await fetch(`/api/call-requests/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    if (r.ok) {
+      const { request } = await r.json();
+      setCallReqs((prev) => prev.map((c) => (c.id === request.id ? request : c)));
+    }
+  }
+  useEffect(() => {
+    void (async () => { await loadMonth(calMonth); })();
+  }, [calMonth]);
 
   function flash(msg: string) { setToast(msg); setTimeout(() => setToast(""), 2400); }
   const visitedToday = (id: number | string) => monthVisits.some((v) => String(v.doctor_id) === String(id) && v.date === today);
 
   const specialties = useMemo(() => Array.from(new Set(doctors.map((d) => d.specialty).filter(Boolean))) as string[], [doctors]);
   const inPlan = useMemo(() => new Set(plan.map((p) => String(p.doctor?.id))), [plan]);
+  const inMyList = useMemo(() => new Set(myList.map((m) => String(m.doctor?.id))), [myList]);
+  // Requests still needing a call back (done ones drop off the inbox).
+  const openCallReqs = useMemo(() => callReqs.filter((c) => c.status !== "done"), [callReqs]);
+
+  // Monthly call target = sum of frequencies; done caps each doctor at their frequency.
+  const monthlyTarget = myList.reduce((s, m) => s + m.frequency, 0);
+  const monthlyDone = myList.reduce((s, m) => s + Math.min(m.visits_this_month, m.frequency), 0);
+
+  const myFiltered = myList.filter((m) => {
+    if (myPatchFilter === "none" && m.patch_id) return false;
+    if (myPatchFilter && myPatchFilter !== "none" && m.patch_id !== myPatchFilter) return false;
+    if (!mySearch) return true;
+    const t = mySearch.toLowerCase();
+    const d = m.doctor;
+    return `${d?.name || ""} ${d?.specialty || ""} ${d?.hospital || ""} ${d?.chamber_address || ""}`.toLowerCase().includes(t);
+  });
+
+  const listPickerDoctors = doctors.filter((d) => {
+    if (inMyList.has(String(d.id))) return false;
+    if (!listPickerSearch) return true;
+    const t = listPickerSearch.toLowerCase();
+    return `${d.name} ${d.specialty || ""} ${d.hospital || ""}`.toLowerCase().includes(t);
+  });
 
   const planDone = plan.filter((p) => p.status === "done").length;
   const planPending = plan.length - planDone;
@@ -184,12 +323,33 @@ export default function MrDashboard() {
     return false;
   }
 
+  // Optimistic add: the row appears instantly; the server confirms in the
+  // background (fixes the ~4s wait — no full re-fetch before the UI updates).
   async function addToPlan(d: Doctor) {
-    const ok = await planRequest("/api/plan", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ doctor_id: d.id }),
-    });
-    if (ok) flash(`＋ ${d.name} added to today's plan`);
+    if (inPlan.has(String(d.id))) return;
+    tempSeq.current += 1; // monotonic id — avoids Date.now() (react-hooks/purity)
+    const tempId = `temp-${d.id}-${tempSeq.current}`;
+    const optimistic: PlanItem = { id: tempId, date: today, order: plan.length + 1, planned_time: null, status: "planned", doctor: d };
+    setPlanItems((prev) => [...prev, optimistic]);
+    flash(`＋ ${d.name} added to today's plan`);
+    try {
+      const res = await fetch("/api/plan", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doctor_id: d.id }),
+      });
+      if (res.ok) {
+        setPlanItems(await res.json()); // reconcile with the server copy
+      } else if (res.status === 409) {
+        await loadPlan(); // already in plan (e.g. another tab) — just resync
+      } else {
+        setPlanItems((prev) => prev.filter((p) => p.id !== tempId)); // roll back
+        const e = await res.json().catch(() => ({} as { error?: string }));
+        flash(e.error || "Could not add to plan");
+      }
+    } catch {
+      setPlanItems((prev) => prev.filter((p) => p.id !== tempId));
+      flash("Network error — could not add to plan");
+    }
   }
   async function move(p: PlanItem, dir: "up" | "down") {
     await planRequest("/api/plan", {
@@ -221,6 +381,131 @@ export default function MrDashboard() {
     await planRequest(`/api/plan?id=${encodeURIComponent(p.id)}`, { method: "DELETE" });
   }
 
+  // Manual "Update Status" from the Today's Plan row. Optimistic: the badge
+  // flips instantly with this MR's name attached; the server then confirms.
+  // Attribution (name) is visible to every MR, so false inputs are accountable.
+  function patchDoctorEverywhere(id: string | number, patch: Partial<Doctor>) {
+    const match = (x?: Doctor | null) => x && String(x.id) === String(id);
+    setDoctors((prev) => prev.map((x) => (match(x) ? { ...x, ...patch } : x)));
+    setPlanItems((prev) => prev.map((p) => (match(p.doctor) ? { ...p, doctor: { ...p.doctor!, ...patch } } : p)));
+    setMyList((prev) => prev.map((m) => (match(m.doctor) ? { ...m, doctor: { ...m.doctor!, ...patch } } : m)));
+    setDetail((prev) => (match(prev) ? { ...prev!, ...patch } : prev));
+  }
+  async function updateDoctorStatus(d: Doctor, status: string) {
+    if (!STATUS[status] || d.status === status) return;
+    const prevPatch: Partial<Doctor> = {
+      status: d.status, status_updated_at: d.status_updated_at,
+      status_updated_by_role: d.status_updated_by_role, status_updated_by_name: d.status_updated_by_name,
+    };
+    patchDoctorEverywhere(d.id, {
+      status,
+      status_updated_at: new Date().toISOString(),
+      status_updated_by_role: "mr",
+      status_updated_by_name: mr.name || "MR",
+    });
+    try {
+      const res = await fetch(`/api/doctors/${d.id}/status`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok) {
+        const { doctor } = (await res.json()) as { doctor: Doctor };
+        patchDoctorEverywhere(doctor.id, doctor); // server copy is authoritative
+        flash(`⟳ ${d.name} — ${statusMeta(status).label} (updated by you)`);
+      } else {
+        patchDoctorEverywhere(d.id, prevPatch); // roll back
+        const e = await res.json().catch(() => ({} as { error?: string }));
+        flash(e.error || "Could not update status");
+      }
+    } catch {
+      patchDoctorEverywhere(d.id, prevPatch);
+      flash("Network error — could not update status");
+    }
+  }
+
+  // ── My Doctors + Call Patches (Phase 3 · MR Tools) ───────────────────────
+  async function myListRequest(input: RequestInfo, init?: RequestInit) {
+    setBusy(true);
+    const res = await fetch(input, init);
+    setBusy(false);
+    if (res.ok) {
+      setMyList(await res.json());
+      return true;
+    }
+    const e = await res.json().catch(() => ({} as { error?: string }));
+    flash(e.error || "Something went wrong");
+    return false;
+  }
+
+  async function addToMyList(d: Doctor) {
+    const ok = await myListRequest("/api/my-doctors", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ doctor_id: d.id }),
+    });
+    if (ok) flash(`＋ ${d.name} added to your list`);
+  }
+  async function setFrequency(m: MyDoctor, frequency: number) {
+    await myListRequest("/api/my-doctors", {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: m.id, frequency }),
+    });
+  }
+  async function setPatchOf(m: MyDoctor, patchId: string) {
+    const ok = await myListRequest("/api/my-doctors", {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: m.id, patch_id: patchId || null }),
+    });
+    if (ok) await loadPatches();
+  }
+  async function removeFromMyList(m: MyDoctor) {
+    if (!confirm(`Remove ${m.doctor?.name ?? "this doctor"} from your list?`)) return;
+    const ok = await myListRequest(`/api/my-doctors?id=${encodeURIComponent(m.id)}`, { method: "DELETE" });
+    if (ok) await loadPatches();
+  }
+
+  async function createPatch() {
+    const name = newPatch.trim();
+    if (!name) { flash("Enter a patch name"); return; }
+    setBusy(true);
+    const res = await fetch("/api/patches", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    setBusy(false);
+    if (res.ok) { setPatches(await res.json()); setNewPatch(""); flash(`Patch “${name}” created`); }
+    else { const e = await res.json().catch(() => ({} as { error?: string })); flash(e.error || "Could not create patch"); }
+  }
+  async function deletePatch(p: CallPatch) {
+    if (!confirm(`Delete patch “${p.name}”? Doctors stay on your list.`)) return;
+    setBusy(true);
+    const res = await fetch(`/api/patches?id=${encodeURIComponent(p.id)}`, { method: "DELETE" });
+    setBusy(false);
+    if (res.ok) {
+      setPatches(await res.json());
+      if (myPatchFilter === p.id) setMyPatchFilter("");
+      await loadMyList();
+      flash(`Patch “${p.name}” deleted`);
+    } else flash("Could not delete patch");
+  }
+  async function loadPatchToday(p: CallPatch) {
+    setBusy(true);
+    const res = await fetch("/api/patches", {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: p.id, action: "load_today" }),
+    });
+    setBusy(false);
+    if (res.ok) {
+      const r = (await res.json()) as { added: number; skipped: number };
+      await loadPlan();
+      setShowLoadPatch(false);
+      setTab("plan");
+      flash(r.added > 0 ? `⚡ ${p.name}: ${r.added} doctor(s) added to today's plan` : `${p.name}: already in today's plan`);
+    } else {
+      const e = await res.json().catch(() => ({} as { error?: string }));
+      flash(e.error || "Could not load patch");
+    }
+  }
+
   // ── Doctors tab actions (existing) ───────────────────────────────────────
   async function markVisit(d: Doctor) {
     if (visitedToday(d.id)) return;
@@ -246,8 +531,19 @@ export default function MrDashboard() {
   async function addDoctor() {
     if (!form.name || !form.name.trim()) { flash("Enter a doctor name"); return; }
     const res = await fetch("/api/doctors", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-    if (res.ok) { setShowAdd(false); setForm({}); await loadDoctors(); flash("Doctor added"); }
-    else flash("Could not add doctor");
+    if (res.ok) {
+      const created = (await res.json()) as Doctor;
+      setShowAdd(false); setForm({});
+      // A doctor you add is a doctor you visit — straight onto your list.
+      await fetch("/api/my-doctors", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ doctor_id: created.id }) });
+      await Promise.all([loadDoctors(), loadMyList()]);
+      flash(created.verified === false
+        ? `${created.name} added to your list — public after admin verification`
+        : `${created.name} added`);
+    } else {
+      const e = await res.json().catch(() => ({} as { error?: string }));
+      flash(e.error || "Could not add doctor");
+    }
   }
 
   const filtered = doctors.filter((d) => {
@@ -296,8 +592,64 @@ export default function MrDashboard() {
           <Stat label="Visits This Month" value={monthVisits.length} sub={`${MONTHS[m]} ${y}`} tone="bg-amber-50 text-amber-600" />
         </section>
 
+        {/* Module 5 · Call MR — incoming call-back requests from doctors/staff */}
+        {openCallReqs.length > 0 && (
+          <section className="mt-5 rounded-2xl border border-blue-200 bg-blue-50/60 p-4 shadow-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-lg">📞</span>
+              <span className="font-bold">Call-back requests</span>
+              <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[11px] font-bold text-white">{openCallReqs.length}</span>
+              <div className="flex-1" />
+              {openCallReqs.length > 3 && (
+                <button
+                  onClick={() => setShowAllCallReqs((v) => !v)}
+                  className="rounded-lg border border-blue-200 bg-white px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                >
+                  {showAllCallReqs ? "Show less" : `Show all (${openCallReqs.length})`}
+                </button>
+              )}
+            </div>
+            <div className="mt-3 space-y-2">
+              {(showAllCallReqs ? openCallReqs : openCallReqs.slice(0, 3)).map((c) => (
+                <div key={c.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 md:flex-nowrap">
+                  <div className="grid h-10 w-10 flex-none place-items-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+                    {initials(c.from_name)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-bold">
+                      {c.from_name}
+                      <span className="ml-1 font-normal text-slate-400">· {ROLE_LABEL[c.from_role] ?? c.from_role}</span>
+                      {c.status === "pending" && (
+                        <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 ring-1 ring-amber-200">New</span>
+                      )}
+                    </div>
+                    <div className="truncate text-xs text-slate-500">
+                      {c.note || "Please call back"} · {timeAgo(c.created_at)}
+                    </div>
+                  </div>
+                  {c.status === "pending" && (
+                    <button
+                      onClick={() => setCallReqStatus(c.id, "seen")}
+                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                    >
+                      👁 Mark seen
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setCallReqStatus(c.id, "done")}
+                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                  >
+                    ✓ Called back
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         <div className="mt-5 flex w-max gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
           <button onClick={() => setTab("plan")} className={`rounded-lg px-4 py-2 text-sm font-semibold ${tab === "plan" ? "bg-blue-600 text-white" : "text-slate-500"}`}>📋 Today&apos;s Plan</button>
+          <button onClick={() => setTab("mylist")} className={`rounded-lg px-4 py-2 text-sm font-semibold ${tab === "mylist" ? "bg-blue-600 text-white" : "text-slate-500"}`}>⭐ My Doctors{myList.length ? ` (${myList.length})` : ""}</button>
           <button onClick={() => setTab("doctors")} className={`rounded-lg px-4 py-2 text-sm font-semibold ${tab === "doctors" ? "bg-blue-600 text-white" : "text-slate-500"}`}>🩺 Doctors</button>
           <button onClick={() => setTab("calendar")} className={`rounded-lg px-4 py-2 text-sm font-semibold ${tab === "calendar" ? "bg-blue-600 text-white" : "text-slate-500"}`}>📅 Visit Calendar</button>
         </div>
@@ -314,6 +666,9 @@ export default function MrDashboard() {
                 </div>
               </div>
               <div className="flex-1" />
+              {patches.length > 0 ? (
+                <button onClick={() => setShowLoadPatch(true)} className="h-11 rounded-xl border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-50">⚡ Load Patch</button>
+              ) : null}
               <button onClick={() => { setPickerSearch(""); setShowPicker(true); }} className="h-11 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">＋ Add Doctors</button>
             </div>
 
@@ -347,6 +702,7 @@ export default function MrDashboard() {
                         <div className="truncate text-xs text-slate-500">{d?.specialty}{d?.hospital ? ` · ${d.hospital}` : ""}</div>
                         <div className="mt-1 flex flex-wrap items-center gap-2">
                           <StatusBadge d={d} small />
+                          <PlanChip d={d} />
                           {typeof d?.patients_left === "number" ? <span className="text-[11px] text-slate-500">👥 {d.patients_left} left</span> : null}
                           {fresh ? <span className="text-[11px] text-slate-400">· {fresh}</span> : null}
                         </div>
@@ -359,12 +715,142 @@ export default function MrDashboard() {
                           disabled={done}
                           className="h-9 w-24 rounded-lg border border-slate-200 px-2 text-center text-xs outline-none focus:border-blue-500 disabled:bg-slate-50 disabled:text-slate-400"
                         />
+                        <select
+                          value={d?.status && STATUS[d.status] ? d.status : ""}
+                          disabled={!d}
+                          onChange={(e) => d && e.target.value && updateDoctorStatus(d, e.target.value)}
+                          title="Update this doctor's live status — your name is shown to all MRs"
+                          className="h-9 max-w-[120px] rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500"
+                        >
+                          <option value="" disabled>⟳ Status</option>
+                          {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                        </select>
                         <button onClick={() => d && setDetail(d)} className="h-9 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50">Details</button>
                         <button disabled={busy || done} onClick={() => markPlanDone(p)}
                           className={`h-9 rounded-lg px-3 text-xs font-bold text-white ${done ? "cursor-default bg-emerald-100 !text-emerald-700" : "bg-emerald-600 hover:bg-emerald-700"}`}>
                           {done ? "Done" : "✓ Visit Done"}
                         </button>
                         <button disabled={busy} onClick={() => removeFromPlan(p)} title="Remove from plan"
+                          className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-400 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500">✕</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        ) : tab === "mylist" ? (
+          <section className="mt-4">
+            {/* Monthly coverage summary */}
+            <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="text-2xl font-extrabold">{myList.length}</div>
+                <div className="text-sm font-medium text-slate-500">Doctors on my list</div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="text-2xl font-extrabold">{monthlyTarget}</div>
+                <div className="text-sm font-medium text-slate-500">Monthly call target</div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="text-2xl font-extrabold text-emerald-600">{monthlyDone}</div>
+                <div className="text-sm font-medium text-slate-500">Calls done ({MONTHS[m]})</div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="text-2xl font-extrabold">{monthlyTarget ? Math.round((monthlyDone / monthlyTarget) * 100) : 0}%</div>
+                <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                  <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${monthlyTarget ? Math.min(100, (monthlyDone / monthlyTarget) * 100) : 0}%` }} />
+                </div>
+                <div className="mt-1 text-xs text-slate-400">target coverage</div>
+              </div>
+            </div>
+
+            {/* Call patches */}
+            <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="mb-1 font-bold">Call Patches</div>
+              <div className="mb-3 text-xs text-slate-500">Group your doctors by area/route. One tap loads a whole patch into today&apos;s plan.</div>
+              <div className="flex flex-wrap items-center gap-2">
+                {patches.map((p) => (
+                  <span key={p.id} className={`inline-flex items-center gap-1.5 rounded-full border py-1 pl-3 pr-1 text-xs font-semibold ${myPatchFilter === p.id ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
+                    <button onClick={() => setMyPatchFilter(myPatchFilter === p.id ? "" : p.id)} title="Filter by this patch">
+                      {p.name} · {p.doctor_count}
+                    </button>
+                    <button disabled={busy || p.doctor_count === 0} onClick={() => loadPatchToday(p)} title="Load into today's plan"
+                      className={`grid h-6 w-6 place-items-center rounded-full ${myPatchFilter === p.id ? "hover:bg-blue-500" : "hover:bg-blue-100"} disabled:opacity-30`}>⚡</button>
+                    <button disabled={busy} onClick={() => deletePatch(p)} title="Delete patch"
+                      className={`grid h-6 w-6 place-items-center rounded-full ${myPatchFilter === p.id ? "hover:bg-blue-500" : "hover:bg-rose-50 hover:text-rose-500"}`}>✕</button>
+                  </span>
+                ))}
+                <div className="flex items-center gap-1">
+                  <input value={newPatch} onChange={(e) => setNewPatch(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") createPatch(); }}
+                    placeholder="New patch, e.g. Salt Lake" className="h-8 w-44 rounded-lg border border-slate-200 px-2.5 text-xs outline-none focus:border-blue-500" />
+                  <button disabled={busy} onClick={createPatch} className="h-8 rounded-lg bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-700">＋</button>
+                </div>
+              </div>
+            </div>
+
+            {/* List controls */}
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <input value={mySearch} onChange={(e) => setMySearch(e.target.value)} placeholder="Search my doctors…"
+                className="h-11 min-w-[200px] flex-1 rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none focus:border-blue-500" />
+              <select value={myPatchFilter} onChange={(e) => setMyPatchFilter(e.target.value)} className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm">
+                <option value="">All patches</option>
+                <option value="none">No patch yet</option>
+                {patches.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <button onClick={() => { setListPickerSearch(""); setShowListPicker(true); }} className="h-11 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">＋ Add from Directory</button>
+            </div>
+
+            {myList.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
+                <div className="mb-2 text-3xl">⭐</div>
+                <div className="font-bold">Build your doctor list</div>
+                <div className="mx-auto mt-1 max-w-sm text-sm text-slate-500">Pick the doctors your company assigned to you, set how often to visit each per month, then group them into call patches.</div>
+                <button onClick={() => { setListPickerSearch(""); setShowListPicker(true); }} className="mt-4 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">＋ Add from Directory</button>
+              </div>
+            ) : myFiltered.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center text-slate-400">No doctors match.</div>
+            ) : (
+              <div className="space-y-2">
+                {myFiltered.map((mItem) => {
+                  const d = mItem.doctor;
+                  const covered = mItem.visits_this_month >= mItem.frequency;
+                  const pct = Math.min(100, (mItem.visits_this_month / mItem.frequency) * 100);
+                  return (
+                    <div key={mItem.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:flex-nowrap">
+                      <div className="grid h-11 w-11 flex-none place-items-center rounded-xl bg-gradient-to-br from-blue-500 to-emerald-500 font-bold text-white">{d ? initials(d.name) : "?"}</div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-bold">{d?.name ?? "Doctor removed"}</div>
+                        <div className="truncate text-xs text-slate-500">{d?.specialty}{d?.hospital ? ` · ${d.hospital}` : ""}</div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <StatusBadge d={d} small />
+                          <PlanChip d={d} />
+                          {mItem.patch_name ? <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">📍 {mItem.patch_name}</span> : null}
+                        </div>
+                      </div>
+                      {/* Monthly coverage */}
+                      <div className="w-28 flex-none">
+                        <div className={`text-xs font-bold ${covered ? "text-emerald-600" : "text-slate-600"}`}>{mItem.visits_this_month}/{mItem.frequency} this month{covered ? " ✓" : ""}</div>
+                        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                          <div className={`h-full rounded-full ${covered ? "bg-emerald-500" : "bg-blue-500"}`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                      <div className="flex flex-none items-center gap-2">
+                        <select value={mItem.frequency} disabled={busy} onChange={(e) => setFrequency(mItem, Number(e.target.value))}
+                          title="Visits per month" className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold">
+                          {[1, 2, 3, 4].map((f) => <option key={f} value={f}>{f}×/mo</option>)}
+                        </select>
+                        <select value={mItem.patch_id || ""} disabled={busy} onChange={(e) => setPatchOf(mItem, e.target.value)}
+                          title="Call patch" className="h-9 max-w-[130px] rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold">
+                          <option value="">No patch</option>
+                          {patches.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                        <button disabled={busy || !d || inPlan.has(String(d.id))} onClick={() => d && addToPlan(d)}
+                          title={d && inPlan.has(String(d.id)) ? "Already in today's plan" : "Add to today's plan"}
+                          className={`h-9 rounded-lg border px-3 text-xs font-bold ${d && inPlan.has(String(d.id)) ? "border-blue-100 bg-blue-50 text-blue-400" : "border-blue-200 text-blue-700 hover:bg-blue-50"}`}>
+                          {d && inPlan.has(String(d.id)) ? "In plan" : "＋ Plan"}
+                        </button>
+                        <button onClick={() => d && setDetail(d)} className="h-9 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50">Details</button>
+                        <button disabled={busy} onClick={() => removeFromMyList(mItem)} title="Remove from my list"
                           className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-400 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500">✕</button>
                       </div>
                     </div>
@@ -404,12 +890,19 @@ export default function MrDashboard() {
                       <div className="flex items-start gap-3">
                         <div className="grid h-11 w-11 flex-none place-items-center rounded-xl bg-gradient-to-br from-blue-500 to-emerald-500 font-bold text-white">{initials(d.name)}</div>
                         <div className="min-w-0 flex-1">
-                          <div className="truncate font-bold">{d.name}</div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="truncate font-bold">{d.name}</span>
+                            {d.verified === false ? (
+                              <span className="flex-none rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 ring-1 ring-amber-200">⏳ Pending</span>
+                            ) : null}
+                          </div>
                           <div className="text-sm font-semibold text-blue-600">{d.specialty}</div>
                           <div className="mt-1 space-y-0.5 text-xs text-slate-500">
                             <div className="truncate">🏥 {d.hospital || "—"}</div>
                             <div className="truncate">📍 {d.chamber_address || "—"}</div>
-                            {d.mr_visiting_time ? <div>🕑 MR: {d.mr_visiting_time}</div> : null}
+                            {d.mr_visiting_days || d.mr_visiting_time ? (
+                              <div>🕑 MR: {[d.mr_visiting_days, d.mr_visiting_time].filter(Boolean).join(" · ")}</div>
+                            ) : null}
                           </div>
                         </div>
                         <button onClick={() => setDetail(d)} className="flex-none rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Details</button>
@@ -430,7 +923,9 @@ export default function MrDashboard() {
                           className={`rounded-xl border px-3 py-2.5 text-sm font-bold ${planned ? "border-blue-100 bg-blue-50 text-blue-400" : "border-blue-200 text-blue-700 hover:bg-blue-50"}`}>
                           {planned ? "In plan" : "＋ Plan"}
                         </button>
-                        <button onClick={() => removeDoctor(d)} title="Remove" className="grid w-11 place-items-center rounded-xl border border-slate-200 text-slate-400 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500">🗑</button>
+                        {isAdmin ? (
+                          <button onClick={() => removeDoctor(d)} title="Remove from directory (admin)" className="grid w-11 place-items-center rounded-xl border border-slate-200 text-slate-400 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500">🗑</button>
+                        ) : null}
                       </div>
                     </div>
                   );
@@ -503,13 +998,66 @@ export default function MrDashboard() {
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-bold">{d.name}</div>
                     <div className="truncate text-xs text-slate-500">{d.specialty}{d.hospital ? ` · ${d.hospital}` : ""}</div>
-                    <div className="mt-1"><StatusBadge d={d} small /></div>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5"><StatusBadge d={d} small /><PlanChip d={d} /></div>
                   </div>
                   <button disabled={busy} onClick={() => addToPlan(d)} className="flex-none rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700">＋ Add</button>
                 </div>
               ))}
             </div>
             <button onClick={() => setShowPicker(false)} className="mt-4 w-full rounded-xl border border-slate-200 py-2.5 text-sm font-semibold">Close</button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Add doctors from the directory to my list (Phase 3) */}
+      {showListPicker ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/50 p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowListPicker(false); }}>
+          <div className="flex max-h-[80vh] w-full max-w-lg flex-col rounded-2xl bg-white p-5 shadow-xl">
+            <div className="mb-1 text-lg font-bold">Add to My Doctors</div>
+            <div className="mb-3 text-sm text-slate-500">Pick the doctors your company assigned to you. You can set the visit frequency after adding.</div>
+            <input autoFocus value={listPickerSearch} onChange={(e) => setListPickerSearch(e.target.value)} placeholder="Search doctor, specialty, hospital…"
+              className="mb-3 h-11 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none focus:border-blue-500" />
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+              {listPickerDoctors.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-400">
+                  {doctors.length === 0 ? "The directory is empty." : "No doctors match (or they're already on your list)."}
+                </div>
+              ) : listPickerDoctors.map((d) => (
+                <div key={d.id} className="flex items-center gap-3 rounded-xl border border-slate-200 p-3">
+                  <div className="grid h-10 w-10 flex-none place-items-center rounded-xl bg-gradient-to-br from-blue-500 to-emerald-500 text-sm font-bold text-white">{initials(d.name)}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-bold">{d.name}</div>
+                    <div className="truncate text-xs text-slate-500">{d.specialty}{d.hospital ? ` · ${d.hospital}` : ""}</div>
+                  </div>
+                  <button disabled={busy} onClick={() => addToMyList(d)} className="flex-none rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700">＋ Add</button>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setShowListPicker(false)} className="mt-4 w-full rounded-xl border border-slate-200 py-2.5 text-sm font-semibold">Done</button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Load a call patch into today's plan (Phase 3) */}
+      {showLoadPatch ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/50 p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowLoadPatch(false); }}>
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+            <div className="mb-1 text-lg font-bold">⚡ Load a Call Patch</div>
+            <div className="mb-4 text-sm text-slate-500">Adds every doctor in the patch to today&apos;s plan (doctors already planned are skipped).</div>
+            <div className="space-y-2">
+              {patches.map((p) => (
+                <button key={p.id} disabled={busy || p.doctor_count === 0} onClick={() => loadPatchToday(p)}
+                  className="flex w-full items-center gap-3 rounded-xl border border-slate-200 p-3 text-left hover:border-blue-300 hover:bg-blue-50 disabled:opacity-40">
+                  <div className="grid h-10 w-10 flex-none place-items-center rounded-xl bg-blue-50 font-bold text-blue-700">📍</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-bold">{p.name}</div>
+                    <div className="text-xs text-slate-500">{p.doctor_count} doctor(s)</div>
+                  </div>
+                  <span className="text-blue-600">⚡</span>
+                </button>
+              ))}
+            </div>
+            <button onClick={() => setShowLoadPatch(false)} className="mt-4 w-full rounded-xl border border-slate-200 py-2.5 text-sm font-semibold">Cancel</button>
           </div>
         </div>
       ) : null}
@@ -536,18 +1084,45 @@ export default function MrDashboard() {
                 ["🏥 Hospital", detail.hospital],
                 ["📍 Chamber", detail.chamber_address],
                 ["🩺 Consultation", detail.consultation_timing],
-                ["🕑 MR visiting time", detail.mr_visiting_time],
-                ["🗣 Languages", (detail.languages || []).join(", ")],
-                ["🎓 Experience", detail.experience ? `${detail.experience} years` : ""],
+                ["🕑 MR visiting time", [detail.mr_visiting_days, detail.mr_visiting_time].filter(Boolean).join("\n")],
+                ["🗓 Weekly timetable", ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+                  .map((k) => (detail.timetable?.[k] ? `${k[0].toUpperCase()}${k.slice(1)}: ${detail.timetable[k]}` : null))
+                  .filter(Boolean)
+                  .join("\n")],
                 ["⭐ Rating", detail.rating ? `${detail.rating}/5` : ""],
                 ["👤 Secretary", detail.secretary_contact],
               ] as [string, string | undefined][]).filter(([, v]) => v).map(([label, v]) => (
                 <div key={label} className="flex gap-2">
                   <div className="w-40 flex-none text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</div>
-                  <div className="min-w-0 flex-1 font-medium text-slate-700">{v}</div>
+                  <div className="min-w-0 flex-1 whitespace-pre-line font-medium text-slate-700">{v}</div>
                 </div>
               ))}
             </div>
+
+            {/* Module 4: the doctor's own shared plan for today — cross-check
+                the live status against the doctor's word before travelling. */}
+            {detail.today_plan && detail.today_plan.items.length > 0 ? (
+              <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+                <div className="flex items-center justify-between gap-2 text-xs font-bold text-emerald-800">
+                  <span>📋 Doctor&apos;s shared plan today</span>
+                  {detail.today_plan.started_at ? (
+                    <span className="font-semibold text-emerald-600">▶ Day started</span>
+                  ) : null}
+                </div>
+                <ul className="mt-1.5 space-y-1">
+                  {detail.today_plan.items.map((it) => (
+                    <li key={it.id} className={`flex gap-1.5 text-xs ${it.done ? "text-slate-400 line-through" : "text-emerald-900"}`}>
+                      <span className="flex-none">{it.done ? "✅" : "⏳"}</span>
+                      {it.time ? <span className="whitespace-nowrap font-semibold">{it.time}</span> : null}
+                      <span className="min-w-0">{it.activity}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-1.5 text-[11px] text-emerald-600">
+                  Straight from the doctor — plan your visit around this.
+                </div>
+              </div>
+            ) : null}
 
             <div className="mt-5 flex gap-2">
               {detail.phone ? (
@@ -567,7 +1142,7 @@ export default function MrDashboard() {
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/50 p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowAdd(false); }}>
           <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
             <div className="mb-1 text-lg font-bold">Add Doctor</div>
-            <div className="mb-4 text-sm text-slate-500">Add a doctor to your visiting list.</div>
+            <div className="mb-4 text-sm text-slate-500">Goes straight onto your list, credited to you — and appears publicly once an admin verifies it.</div>
             <div className="space-y-3">
               {([
                 ["name", "Doctor name *", "Dr. Ananya Sen"],
@@ -576,6 +1151,7 @@ export default function MrDashboard() {
                 ["hospital", "Hospital", "Apollo, Kolkata"],
                 ["chamber_address", "Chamber address", "Salt Lake, Kolkata"],
                 ["phone", "Phone", "+91-98300..."],
+                ["mr_visiting_days", "MR visiting days", "Mon, Wed, Fri"],
                 ["mr_visiting_time", "MR visiting time", "4 PM - 6 PM"],
               ] as [string, string, string][]).map(([k, label, ph]) => (
                 <div key={k}>
