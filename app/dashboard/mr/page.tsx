@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { SosButton } from "@/components/sos-button";
 
 type Doctor = {
   id: number | string;
@@ -647,7 +648,7 @@ export default function MrDashboard() {
           </section>
         )}
 
-        <div className="mt-5 flex w-max gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+        <div className="mt-5 flex w-max max-w-full gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
           <button onClick={() => setTab("plan")} className={`rounded-lg px-4 py-2 text-sm font-semibold ${tab === "plan" ? "bg-blue-600 text-white" : "text-slate-500"}`}>📋 Today&apos;s Plan</button>
           <button onClick={() => setTab("mylist")} className={`rounded-lg px-4 py-2 text-sm font-semibold ${tab === "mylist" ? "bg-blue-600 text-white" : "text-slate-500"}`}>⭐ My Doctors{myList.length ? ` (${myList.length})` : ""}</button>
           <button onClick={() => setTab("doctors")} className={`rounded-lg px-4 py-2 text-sm font-semibold ${tab === "doctors" ? "bg-blue-600 text-white" : "text-slate-500"}`}>🩺 Doctors</button>
@@ -1168,6 +1169,10 @@ export default function MrDashboard() {
           </div>
         </div>
       ) : null}
+
+      {/* Emergency SOS — floating on every tab; shares live GPS + MR name
+          with the saved emergency contact via WhatsApp/SMS/call. */}
+      <SosButton mrName={mr.name} />
 
       {toast ? <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-lg">{toast}</div> : null}
     </div>

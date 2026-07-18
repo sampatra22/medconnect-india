@@ -1,0 +1,247 @@
+# MedConnect India — Context Feed File (v2)
+# Paste this into any new chat (or Cowork session) to restore full project context instantly.
+# Last Updated: 2026-07-14 — regenerated from a full code audit. SUPERSEDES Feed 1 (2026-07-13).
+# Feed 1 is badly outdated: the project moved to Auth.js + Prisma/Neon, Module 4 shipped
+# with an extra layer, MR tools + Call MR shipped, and roles were reworked.
+
+---
+
+## WHAT THIS PROJECT IS
+
+MedConnect India is a Next.js web platform connecting India's pharma ecosystem:
+MRs (medical representatives), doctors, clinic staff, chemists, stockists, and
+pharma companies. A trust network — every feature must earn trust: secure,
+reliable, efficient, no shortcuts. Current data is placeholder; structure first.
+
+Core promise: "Find doctors in real time, discover jobs, track visits, and grow
+your pharma career — all in one place."
+Positioning: "India's Pharma Ecosystem, Connected."
+
+Builder: Medical sales rep (Sam), transitioning to martech/growth freelancing.
+Intermediate coder. 2–4 hrs/day alongside day job.
+
+---
+
+## ENVIRONMENT
+
+- Project location: C:\Users\Sam\medconnect-india (Windows 11)
+- Shell: PowerShell · IDE: VS Code · Dev server: npm run dev → localhost:3000
+- Stack: Next.js 16.2.10 + TypeScript + Tailwind CSS v4 + Shadcn UI
+  (⚠️ Next 16 has breaking changes vs training data — read node_modules/next/dist/docs/
+  before writing code; see AGENTS.md at repo root)
+- Auth: Auth.js (next-auth v5 beta) Credentials provider + bcryptjs
+- Database: PostgreSQL on Neon via Prisma 5 — ACTIVE, both dev and prod
+  (DATABASE_URL in .env/.env.local; AUTH_SECRET in .env.local)
+- data/*.json files are now ONLY seed sources (prisma/seed.mjs), not live stores
+- Deployment: Vercel (GitHub sampatra22/medconnect-india, auto-deploy on push to main)
+- Prisma Studio: localhost:5555 for manual data entry
+
+---
+
+## ⚠️ REVERSED / CORRECTED DECISIONS (vs Feed 1)
+
+1. Auth is now Auth.js at /api/auth/[...nextauth] (auth.ts + auth.config.ts).
+   The old rule "never use /api/auth/*, custom /api/login only" is DEAD.
+   /api/login no longer exists. Passwords are bcrypt-hashed. Login is
+   brute-force limited (5 fails / email / 5 min).
+2. Prisma + Neon PostgreSQL is live NOW (not "later"). 7 migrations applied.
+3. Status values re-widened to SIX: available | busy | holiday | no_mr_today |
+   token_full | opd_closed (Feed 1's "3 only" was reversed).
+4. Timetable format is simple strings per day, not {start,end} arrays:
+   weeklyTimetable JSON = { "mon": "10 AM – 1 PM, 6 – 9 PM", ... } (istDayKey keys)
+5. Roles reworked: Recruiter DELETED (Pharma Company absorbs it); Stockist ADDED.
+6. There is NO /doctors/[id] profile page — the directory is one page with
+   rich expandable cards (status, timetable, day plan, audit attribution).
+7. mr@test.com / 123456 never existed — that was the Feed 1 "login bug".
+   Real test logins (bcrypt-seeded from data/users.json):
+   - sam@medconnect.com / sam123 (admin)
+   - ravi@medconnect.com / ravi123 (mr)
+   - anjali@medconnect.com / anjali123 (doctor — seed links her to the
+     "Dr. Anjali Mehta" directory profile)
+   - priya@medconnect.com / priya123 (chemist)
+   - hr@cipla.com / cipla123 (company)
+   - stockist@medconnect.com / stockist123 (stockist)
+
+---
+
+## ROLES & PERMISSIONS (lib/roles.ts — THE only place roles live)
+
+UI roles: admin, mr, doctor, clinic_staff, chemist, stockist, company
+(Prisma enum: ADMIN, MEDICAL_REP, DOCTOR, CLINIC_STAFF, CHEMIST, STOCKIST, PHARMA_COMPANY)
+
+Permissions (rolesWith(permission) drives every route guard — never hard-code roles):
+- manage_users: admin
+- set_doctor_status: admin, mr, doctor, clinic_staff
+- set_patient_count: admin, mr, clinic_staff (mr → "mr_estimate", others → "clinic_staff")
+- share_day_plan (timetable + day plan, ownership enforced): admin, doctor
+- plan_visits (MR planner/tracker): admin, mr
+- call_mr: admin, doctor, chemist, stockist
+- receive_call_requests: admin, mr
+- post_vacancy / view_vacancy: defined in config, NO routes/UI yet (future Job module)
+
+Login homes: admin → /admin/users, mr → /dashboard/mr, doctor → /dashboard/doctor,
+rest → /dashboard. Self-signup (/signup) creates MR accounts ONLY; admin creates
+all other roles. Doctor accounts attach to directory profiles via one-time
+atomic claim flow (POST /api/doctors/claim).
+
+---
+
+## BUILD STATUS
+
+### ✅ DONE (all tsc-clean as of 2026-07-14)
+
+Module 1 — Homepage (app/page.tsx): hero, search UI (not wired), carousel,
+news preview, testimonials, stats, download section, footer.
+
+Module 2 — Auth (REBUILT on Auth.js): login page + login-modal component,
+signup (MR-only, rate-limited 5/IP/hr), role-based redirect, session identity.
+
+Admin — User Manager (app/admin/users + /api/admin/users, admin-only).
+
+Module 3 — Doctor Directory (app/doctors/page.tsx, public):
+cards with search + city/specialty/hospital/status filters, live status badge,
+"N patients left · Updated Xm ago by <name> (<role>)" attribution,
+today's timetable hours on the card, doctor's shared day plan (items + "▶ Started"),
+MR visiting days/time, doctors sharing a day plan ranked first,
+inline status/patient updates for logged-in editor roles.
+
+Module 4 — Live Doctor Status (SHIPPED, three layers):
+1. Live status — 6 values (above) + patients_left + patients_source,
+   updater attribution (name/role/time), full audit trail (DoctorUpdate rows).
+2. Weekly timetable — doctor-maintained recurring hours, public.
+   PUT /api/doctors/[id]/timetable (share_day_plan, own profile only).
+3. Day plan (NEW third layer) — doctor's shared day-wise plan/to-do
+   ("10–1 OPD", "2–4 rounds"), items {id,time,activity,done}, shared flag,
+   "Start My Day" timestamp. Public read of shared plans.
+   GET (public) / PUT /api/doctors/[id]/day-plan.
+Doctor Dashboard (/dashboard/doctor): claim profile → set status, edit day
+plan + share toggle, edit weekly timetable, request calls from MRs (MR search).
+
+Modules 5+6 (RENUMBERED — shipped as "MR tools + Call MR", NOT the job portal):
+- MR Dashboard (/dashboard/mr), tabs: Today's Plan | My List | Doctors | Calendar
+- Daily plan: ordered checklist (PlanItem: planned|done|skipped, rearrange,
+  planned time), "visit done" writes a permanent Visit row AND can update
+  doctor status (optimistic UI with rollback)
+- My Doctors (MrDoctor): personal working list w/ monthly frequency (1–4),
+  visits-this-month progress = monthly call target
+- Call Patches (Patch): named doctor groups (e.g. "Patch A – Salt Lake"),
+  load a patch into today's plan in one tap
+- Visit history month calendar (/api/visits)
+- Call MR (CallRequest): doctor/chemist/stockist requests a call → MR inbox
+  on dashboard, statuses pending|seen|done (10/user/hr rate limit)
+
+### 🔲 NOT BUILT YET
+- Job/Vacancy portal (permissions reserved: post_vacancy/view_vacancy)
+- Dashboards for clinic_staff / chemist / stockist / company (generic
+  /dashboard success card only)
+- Homepage search wiring, Google Maps embed (lat/long fields exist on Doctor),
+  news, learning center, forum, product DB, notifications, global search
+- SEO doctor pages (decided, not done): SSR/SSG + Physician schema,
+  URL /doctors/[city]/[specialty]/[name-slug]
+
+### ⚠️ REPO STATE (2026-07-14)
+Last commit: da48c87 "MR Dashboard: daily plan with rearrange, doctor details,
+plan API". LARGE uncommitted set: day-plan/timetable/claim/me routes,
+call-requests, my-doctors, patches, mrs, doctor dashboard, lib/api|ist|rate-limit,
+3 newest migrations, AGENTS.md, seed changes. → Commit + push is overdue
+(Vercel deploys from main).
+
+---
+
+## DATABASE (prisma/schema.prisma — PostgreSQL)
+
+User (cuid id, unique email, bcrypt password, name, Role enum)
+Doctor (userId? unique = claim link; profile fields; latitude/longitude?;
+  mrVisitingTime/Days; status, patientsLeft, patientsSource,
+  statusUpdatedAt/ById/ByName/ByRole; weeklyTimetable Json)
+DoctorDayPlan (doctorId+date unique, items Json [{id,time,activity,done}],
+  shared bool, startedAt)
+PlanItem (mrId+date+doctorId unique, order, plannedTime, status planned|done|skipped)
+MrDoctor (mrId+doctorId unique, frequency 1–4, patchId?)
+Patch (mrId+name unique)
+DoctorUpdate (audit: doctorId, userId/Name/Email, role, changes Json, createdAt)
+CallRequest (mrId, fromUserId/Name/Role, doctorId?, note, status pending|seen|done)
+Visit (doctorId, date "YYYY-MM-DD", time, status, notes, mrId/Name/Email)
+
+Names denormalized on Visit/DoctorUpdate/CallRequest so records stay readable
+if accounts change. Dates = IST calendar days via lib/ist.ts.
+
+---
+
+## API MAP (all JSON snake_case via lib/serialize.ts serializers)
+
+Public reads:  GET /api/doctors · GET /api/doctors/[id]/day-plan (shared only)
+Auth:          /api/auth/* (Auth.js) · POST /api/signup (MR only)
+Doctors:       POST /api/doctors (mr, admin) · DELETE /api/doctors/[id] (admin)
+Module 4:      PUT /api/doctors/[id]/status · PUT .../timetable · PUT .../day-plan
+               GET /api/doctors/me · POST /api/doctors/claim (atomic, one-time)
+MR tools:      /api/plan · /api/my-doctors · /api/patches (GET/POST/PATCH/DELETE, plan_visits)
+               GET/POST /api/visits (mr, admin)
+Call MR:       GET/POST /api/call-requests · PUT /api/call-requests/[id]
+               GET /api/mrs (MR search, call_mr roles)
+Admin:         /api/admin/users (admin CRUD)
+Misc:          GET /api/users/[id] (any signed-in user — audit-trail identity check)
+
+---
+
+## ENGINEERING PRINCIPLES (AGENTS.md — non-negotiable, all helpers exist)
+
+1. Roles/permissions ONLY in lib/roles.ts (rolesWith) — never hard-code.
+2. Identity from session (requireUser in lib/authz.ts), NEVER from request body.
+   Ownership checks gate personal resources; admin may override.
+3. Every route wrapped in guarded() (lib/api.ts) → clean JSON 500s.
+   Every write endpoint rate-limited (lib/rate-limit.ts) by user id or IP.
+4. Every data edit audited via DoctorUpdate (who/what/when) — no anonymous
+   changes ever. Surface freshness + editor in UI ("12m ago by Clinic Staff").
+5. Clamp all free-text (trim + length cap) before storing.
+6. Concurrency-sensitive writes atomic (updateMany guards, unique constraints).
+7. IST calendar days ("YYYY-MM-DD") via lib/ist.ts only.
+8. snake_case API JSON via lib/serialize.ts only.
+9. bcrypt passwords · security headers in next.config.ts (nosniff, DENY frames,
+   referrer policy, permissions policy, no x-powered-by).
+10. Boring proven patterns. Small verifiable steps. npx tsc --noEmit before "done".
+
+---
+
+## MARKETING STRATEGY (unchanged, running alongside build)
+
+WhatsApp broadcast + face-to-face, ₹0 budget, own territory first, MRs first.
+Active: WhatsApp Status Board — daily branded card, 3–5 doctor statuses from
+own beat at lunch (~15 min/day); group = waitlist/beta pool → migrate to app.
+Growth loop: MRs generate doctor data → better data attracts more MRs.
+Field play: QR cards in chamber waiting rooms; onboard clinic secretaries
+(10 secretaries = reliable data). Public face: brand-only, Sam low-key.
+
+---
+
+## BRAND VOICE (QUICK REFERENCE)
+
+We are: practical, outcome-focused, warm, India-first, backed by numbers.
+We are not: abstract, corporate-distant, jargon-heavy, Western-reference.
+Name roles explicitly (MRs, doctors, chemists, stockists, recruiters→companies).
+India context: CDSCO, territories, Sun Pharma, Cipla. No superlatives without
+data. No "healthcare professionals" catch-all, no "pharmacy reps"/"detailers".
+In-product: brief, warm, sparing emoji (👋 ✅). Marketing: no emoji, benefit-led.
+
+---
+
+## WORKING PRINCIPLES
+
+- One module at a time: build → test → approve → next.
+- Commands labeled [Terminal] (PowerShell) / [VS Code] / [Browser], with
+  expected output stated before each step. PowerShell syntax only.
+- Direct numbered steps, no multiple-choice questions. Honest pushback.
+- One Active Project rule: MedConnect India. New ideas → parking lot.
+- Verification before module approval: tsc clean, renders at path, nav works,
+  data correct, mobile responsive, no console errors, brand voice matches.
+
+---
+
+## QUICK COMMANDS
+
+npm run dev                      # dev server → localhost:3000
+npx tsc --noEmit                 # type check (run before declaring done)
+npx prisma studio                # DB browser → localhost:5555
+npx prisma migrate dev           # create/apply migration (dev)
+npx prisma db seed               # seed from data/*.json (bcrypt-hashes users)
+git add . ; git commit -m "..." ; git push origin main   # deploy via Vercel

@@ -3,19 +3,29 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/authz";
 import { serializeDoctor } from "@/lib/serialize";
 import { rolesWith } from "@/lib/roles";
+import { guarded } from "@/lib/api";
+import { rateLimit } from "@/lib/rate-limit";
 
 const STATUSES = ["available", "busy", "holiday", "no_mr_today", "token_full", "opd_closed"];
 // Role lists come from the central config in lib/roles.ts — never hard-code them.
 const CAN_SET_STATUS = rolesWith("set_doctor_status");
 const CAN_SET_PATIENTS = rolesWith("set_patient_count");
 
-export async function PUT(
+export const PUT = guarded(async (
   request: Request,
   context: { params: Promise<{ id: string }> }
-) {
+) => {
   // Identity comes from the session — never from the request body.
   const { user, response } = await requireUser(CAN_SET_STATUS);
   if (!user) return response;
+
+  // Abuse guard: an MR updating a full day's beat stays well inside this.
+  if (!rateLimit(`status:${user.id}`, 60, 10 * 60 * 1000)) {
+    return NextResponse.json(
+      { error: "Too many status updates. Please slow down." },
+      { status: 429 }
+    );
+  }
 
   const { id } = await context.params;
   const b = await request.json().catch(() => ({} as Record<string, unknown>));
@@ -23,6 +33,15 @@ export async function PUT(
   const doctor = await prisma.doctor.findUnique({ where: { id } });
   if (!doctor) {
     return NextResponse.json({ error: "Doctor not found." }, { status: 404 });
+  }
+
+  // Module 4 spec: a doctor updates only THEIR OWN live status.
+  // MRs and clinic staff report on any doctor; admin can fix anything.
+  if (user.role === "doctor" && doctor.userId !== user.id) {
+    return NextResponse.json(
+      { error: "You can only update your own live status." },
+      { status: 403 }
+    );
   }
 
   const changes: Record<string, { from: string | number | null; to: string | number | null }> = {};
@@ -86,4 +105,4 @@ export async function PUT(
     include: { updates: { orderBy: { createdAt: "desc" }, take: 20 } },
   });
   return NextResponse.json({ doctor: serializeDoctor(updated) });
-}
+});

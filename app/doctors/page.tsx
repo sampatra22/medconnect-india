@@ -3,6 +3,11 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { EditorProfile } from "@/components/auth/editor-profile";
+import { rolesWith } from "@/lib/roles";
+
+// Role lists come from the central config in lib/roles.ts — never hard-code them.
+const CAN_STATUS = rolesWith("set_doctor_status");
+const CAN_PATIENTS = rolesWith("set_patient_count");
 
 type HistoryEntry = {
   timestamp: string;
@@ -48,6 +53,8 @@ type Doctor = {
   status_updated_by_name?: string | null;
   status_updated_by_id?: string | number | null;
   updateHistory?: HistoryEntry[];
+  // Module 4: account that owns this profile (claim flow) — gates inline editing
+  user_id?: string | null;
   // Module 6: attribution + verification state
   verified?: boolean;
   added_by_name?: string | null;
@@ -188,9 +195,12 @@ export default function DoctorsPage() {
   const { data: session } = useSession();
   const user = (session?.user as User | undefined) ?? null;
 
-  const canUpdateStatus =
-    user && ["mr", "admin", "doctor", "clinic_staff"].includes(user.role);
-  const canUpdatePatients = user && ["mr", "admin", "clinic_staff"].includes(user.role);
+  const canUpdateStatus = !!user && CAN_STATUS.includes(user.role);
+  const canUpdatePatients = !!user && CAN_PATIENTS.includes(user.role);
+  // Module 4 spec: a doctor edits only their OWN card; MRs/clinic staff/admin any.
+  const canEditCard = (d: Doctor) =>
+    canUpdateStatus &&
+    (user!.role !== "doctor" || (d.user_id ?? null) === String(user!.id));
 
   async function loadDoctors() {
     setLoading(true);
@@ -203,6 +213,10 @@ export default function DoctorsPage() {
   }
 
   useEffect(() => {
+    // Homepage search lands here as /doctors?q=… — pre-fill the search box.
+    // Read on mount (not useSearchParams) to avoid a Suspense boundary.
+    const q = new URLSearchParams(window.location.search).get("q");
+    if (q) setSearch(q);
     // Async wrapper keeps setState out of the effect body (react-hooks/set-state-in-effect).
     void (async () => {
       await loadDoctors();
@@ -266,6 +280,10 @@ export default function DoctorsPage() {
   return (
     <div className="min-h-screen bg-blue-50">
       <div className="max-w-6xl mx-auto px-4 py-8">
+        {/* Way back home for public visitors landing from search */}
+        <a href="/" className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-700 hover:underline mb-4">
+          ← MedConnect India
+        </a>
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
           <div>
@@ -361,7 +379,8 @@ export default function DoctorsPage() {
                       </h2>
                       <p className="text-sm text-blue-700 font-medium">{d.specialty}</p>
                       <p className="text-xs text-gray-500">{d.qualification}</p>
-                      {d.added_by_name ? (
+                      {/* Attribution is MR-internal — hide from the public */}
+                      {user && d.added_by_name ? (
                         <p className="text-[11px] text-gray-400 mt-0.5">Added by {d.added_by_name} ({roleLabel(d.added_by_role)})</p>
                       ) : null}
                     </div>
@@ -556,7 +575,7 @@ export default function DoctorsPage() {
                   </div>
 
                   {/* Update controls */}
-                  {canUpdateStatus && (
+                  {canEditCard(d) && (
                     <div className="mt-4 pt-3 border-t border-gray-100">
                       <p className="text-xs font-semibold text-gray-500 mb-2">
                         Update status
