@@ -151,6 +151,25 @@ function istClock(iso: string | null): string | null {
   });
 }
 
+// ── The number that answers ─────────────────────────────────────────────────
+// A status is only half the answer; the other half is a call that connects.
+// The secretary/chamber desk is the number that actually picks up during OPD —
+// the doctor's own mobile usually doesn't. Prefer the desk, fall back to the
+// doctor, render nothing when there is no number (phone data is sensitive:
+// no number listed means the doctor wants none shown).
+function callTarget(d: Doctor): { number: string; via: string } | null {
+  const sec = (d.secretary_contact ?? "").trim();
+  if (sec) return { number: sec, via: "chamber desk" };
+  const own = (d.phone ?? "").trim();
+  if (own) return { number: own, via: "doctor's number" };
+  return null;
+}
+
+// "+91-98765 43210" → "tel:+919876543210"
+function telHref(raw: string): string {
+  return `tel:${raw.replace(/[^+\d]/g, "")}`;
+}
+
 export default function DoctorsPage() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -649,6 +668,30 @@ export default function DoctorsPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* Tap-to-call: the patient's next move after reading the
+                      status. Freshness-aware label — when nothing is confirmed
+                      today, the honest pitch is "call and check". */}
+                  {(() => {
+                    const t = callTarget(d);
+                    if (!t) return null;
+                    const live = statusFreshness(
+                      d.status,
+                      d.status_updated_at,
+                      d.status_updated_by_role
+                    ).isLive;
+                    return (
+                      <a
+                        href={telHref(t.number)}
+                        className="mt-3 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-700 py-2.5 text-sm font-bold text-white"
+                      >
+                        📞 {live ? "Call chamber" : "Call to check today's timing"}
+                        <span className="font-normal text-emerald-100 text-xs">
+                          ({t.via})
+                        </span>
+                      </a>
+                    );
+                  })()}
 
                   {/* Update controls */}
                   {canEditCard(d) && (

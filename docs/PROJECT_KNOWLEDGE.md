@@ -304,6 +304,12 @@ review says otherwise.
 - **Dead files pending deletion:** `data/{doctors,users,visits}.json` — zero code
   references; `git rm` blocked in the VM (no unlink). Delete locally:
   `git rm data/doctors.json data/users.json data/visits.json && git commit -m "Remove dead flat-file era data"`
+- **Done 2026-07-20 (6): tap-to-call.** Every directory card gets a prominent
+  `tel:` button — chamber desk (`secretaryContact`) preferred over the
+  doctor's own number; label is freshness-aware ("Call chamber" when live,
+  "Call to check today's timing" when stale); hidden when no number exists
+  (sensitive-by-absence rule). Full per-chamber context-aware numbers stay in
+  the parking lot behind structured chamber data.
 - **Done 2026-07-20 (5): PA update link** (approved trade-off: possession of
   link = authorization). `Doctor.statusKey` (unique, nullable, never
   serialized) + migration `20260720190000_pa_status_update_link` (**apply
