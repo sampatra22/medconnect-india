@@ -321,6 +321,30 @@ review says otherwise.
   `＋ Add "<what you typed>" to the directory`, prefilling the name.
   **Still missing here: the consent checkbox** (pre-launch blocker 2).
 
+- **Done 2026-07-21 (12): audit-driven build — fallback, edit, GPS.**
+  Audit of live data found: only **1 of 206** doctors had a weekly timetable,
+  so 205 fell through to "Not confirmed today" every morning while their OPD
+  hours sat unused on the same card. `timetableFallback()` now takes a third
+  argument and drops to `consultationTiming` (all 206 have it) — day-specific
+  timetable still wins; nothing known still returns null. Applied to the badge
+  AND the share message so a WhatsApp post can't say "timing not confirmed"
+  while the card shows hours.
+  **Edit was impossible** (create/approve/delete only) — a field typo meant
+  deleting the profile and its history. New `PATCH /api/doctors/[id]`:
+  whitelisted fields only (status/consent/verification deliberately excluded —
+  each has its own guarded route), MR may correct what THEY added, admin any,
+  every field change written to the audit trail. UI: "✏️ Edit" in the MR
+  detail modal (shown only where the server would allow it) reusing the add
+  form in edit mode (consent block hidden — it was recorded at creation), and
+  inline editing in the admin approvals queue, which is where typos actually
+  get noticed. Also added the missing `secretary_contact` + `consultation_timing`
+  fields to the form (**92 of 206 doctors have no chamber number**, so
+  tap-to-call falls back to the personal mobile that doesn't answer).
+  **GPS**: Nominatim already returned lat/lon and we discarded it; the combobox
+  now has an `onPick` hook, the MR dashboard caches coordinates by label, and
+  both create and PATCH persist them (bounds-checked). 0 of 206 had coords —
+  Directions was impossible without this.
+
 - **Fixed 2026-07-21 (11): auth-state bugs across public pages.** Reported:
   signed in as admin, the homepage still offered "Log in / Sign Up", showed no
   identity, and gave no way back. Root cause: every public page rendered its

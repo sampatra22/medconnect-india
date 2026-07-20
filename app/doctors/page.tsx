@@ -9,7 +9,7 @@ import {
   StatusAttribution,
   STATUS_LABEL,
 } from "@/components/doctor-status";
-import { statusFreshness } from "@/lib/status-freshness";
+import { statusFreshness, timetableFallback } from "@/lib/status-freshness";
 import { doctorShareMessage } from "@/lib/doctor-share";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
@@ -189,7 +189,9 @@ function shareHref(d: Doctor): string {
     confidence: f.confidence,
     patientsLeft: d.patients_left,
     patientsSource: d.patients_source,
-    todayHours: d.timetable?.[istDayKey()] ?? null,
+    // Same fallback ladder as the badge, so a shared message never says
+    // "timing not confirmed" while the card shows OPD hours.
+    todayHours: timetableFallback(d.timetable, istDayKey(), d.consultation_timing),
     place: d.hospital,
     number: callTarget(d)?.number ?? null,
     link: `${typeof window !== "undefined" ? window.location.origin : ""}/doctors?q=${encodeURIComponent(d.name)}`,

@@ -41,6 +41,7 @@ type Doctor = {
   } | null;
   // Module 6: attribution + verification state
   verified?: boolean;
+  added_by_id?: string | null;
   added_by_name?: string | null;
   added_by_role?: string | null;
 };
@@ -273,6 +274,10 @@ export default function MrDashboard() {
     hospitals: string[];
   }>({ specialties: [...SPECIALTIES], qualifications: [...QUALIFICATIONS], addresses: [], hospitals: [] });
   const vocabLoaded = useRef(false);
+  // label → coordinates, filled by map search, read when a suggestion is picked.
+  const geoCache = useRef(new Map<string, { lat: number; lon: number }>());
+  // Set when the form is correcting an existing profile rather than creating.
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [calMonth, setCalMonth] = useState(new Date());
   const [selDate, setSelDate] = useState(istToday());
   // Module 5 · Call MR — incoming call requests (doctor name + when + note)
@@ -288,8 +293,38 @@ export default function MrDashboard() {
   // Open the create-doctor form, pulling the suggestion vocabulary the first
   // time. Failure is silent and harmless — the curated defaults still work.
   async function openAddDoctor(prefillName?: string) {
+    setEditingId(null);
+    setForm(prefillName ? { name: prefillName } : {});
     setShowAdd(true);
-    if (prefillName) setForm((f) => ({ ...f, name: prefillName }));
+    await loadVocab();
+  }
+
+  // Mirrors the server rule in PATCH /api/doctors/[id]: an MR may correct what
+  // they entered, an admin may correct anything.
+  const canEdit = (d: Doctor | null) =>
+    !!d && (isAdmin || (!!d.added_by_id && String(d.added_by_id) === String(mr.id)));
+
+  // Correct a profile this MR added (admins may correct any — the server
+  // enforces both). Reuses the same form: one place to keep field-consistent.
+  async function openEditDoctor(d: Doctor) {
+    setEditingId(String(d.id));
+    setForm({
+      name: d.name ?? "",
+      specialty: d.specialty ?? "",
+      qualification: d.qualification ?? "",
+      hospital: d.hospital ?? "",
+      chamber_address: d.chamber_address ?? "",
+      phone: d.phone ?? "",
+      secretary_contact: d.secretary_contact ?? "",
+      consultation_timing: d.consultation_timing ?? "",
+      mr_visiting_days: d.mr_visiting_days ?? "",
+      mr_visiting_time: d.mr_visiting_time ?? "",
+    });
+    setShowAdd(true);
+    await loadVocab();
+  }
+
+  async function loadVocab() {
     if (vocabLoaded.current) return;
     vocabLoaded.current = true;
     try {
@@ -301,10 +336,18 @@ export default function MrDashboard() {
   }
 
   // Free map lookup for chamber addresses (OpenStreetMap via our own proxy).
+  // Coordinates are kept aside keyed by label so that if the MR PICKS a
+  // searched address we can save its GPS with the profile — collecting them
+  // later would mean walking every chamber again.
   async function searchAddress(q: string): Promise<string[]> {
     const r = await fetch(`/api/geo/search?q=${encodeURIComponent(q)}`, { cache: "no-store" });
     if (!r.ok) return [];
-    const { results } = (await r.json()) as { results: { label: string }[] };
+    const { results } = (await r.json()) as {
+      results: { label: string; lat: number | null; lon: number | null }[];
+    };
+    for (const x of results) {
+      if (x.lat != null && x.lon != null) geoCache.current.set(x.label, { lat: x.lat, lon: x.lon });
+    }
     return results.map((x) => x.label);
   }
 
@@ -619,6 +662,28 @@ export default function MrDashboard() {
   }
   async function addDoctor() {
     if (!form.name || !form.name.trim()) { flash("Enter a doctor name"); return; }
+    // Coordinates only exist when the MR picked a searched address.
+    const geo = geoCache.current.get((form.chamber_address || "").trim());
+
+    // Correcting an existing profile: no consent step (already recorded), and
+    // the change goes to the audit trail rather than creating a new doctor.
+    if (editingId) {
+      const r = await fetch(`/api/doctors/${editingId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, ...(geo ? { latitude: geo.lat, longitude: geo.lon } : {}) }),
+      });
+      if (r.ok) {
+        setShowAdd(false); setEditingId(null); setForm({});
+        await loadDoctors();
+        flash("Details corrected");
+      } else {
+        const e = await r.json().catch(() => ({} as { error?: string }));
+        flash(e.error || "Could not save changes");
+      }
+      return;
+    }
+
     if (form.consent !== "yes") { flash("Please confirm the doctor agreed to be listed"); return; }
     const res = await fetch("/api/doctors", {
       method: "POST",
@@ -627,6 +692,7 @@ export default function MrDashboard() {
         ...form,
         consent_given: true,
         consent_note: form.consent_note || "",
+        ...(geo ? { latitude: geo.lat, longitude: geo.lon } : {}),
       }),
     });
     if (res.ok) {
@@ -1253,6 +1319,16 @@ export default function MrDashboard() {
               {!inPlan.has(String(detail.id)) ? (
                 <button disabled={busy} onClick={async () => { await addToPlan(detail); }} className="flex-1 rounded-xl border border-blue-200 py-2.5 text-sm font-bold text-blue-700 hover:bg-blue-50">＋ Add to Plan</button>
               ) : null}
+              {/* Correct a profile you added (admins: any). Shown only where
+                  the server would actually allow it, so the button never lies. */}
+              {canEdit(detail) ? (
+                <button
+                  onClick={() => { const d = detail; setDetail(null); void openEditDoctor(d); }}
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                >
+                  ✏️ Edit
+                </button>
+              ) : null}
               <button onClick={() => setDetail(null)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold">Close</button>
             </div>
           </div>
@@ -1263,8 +1339,12 @@ export default function MrDashboard() {
       {showAdd ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/50 p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowAdd(false); }}>
           <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
-            <div className="mb-1 text-lg font-bold">Add Doctor</div>
-            <div className="mb-4 text-sm text-slate-500">Goes straight onto your list, credited to you — and appears publicly once an admin verifies it.</div>
+            <div className="mb-1 text-lg font-bold">{editingId ? "Correct details" : "Add Doctor"}</div>
+            <div className="mb-4 text-sm text-slate-500">
+              {editingId
+                ? "Fix a typo or update details. The change is recorded in this doctor's edit history under your name."
+                : "Goes straight onto your list, credited to you — and appears publicly once an admin verifies it."}
+            </div>
             {/* Suggested fields keep the directory's vocabulary consistent —
                 three characters should land a canonical value — but every one
                 of them still accepts free text for the case the list misses. */}
@@ -1312,6 +1392,12 @@ export default function MrDashboard() {
                   onChange={(v) => setForm({ ...form, chamber_address: v })}
                   suggestions={rankSuggestions(vocab.addresses, form.chamber_address || "", 5)}
                   onSearch={searchAddress}
+                  onPick={(v) => {
+                    // Picking a map result is what earns coordinates; typing
+                    // a free-text address simply doesn't have any.
+                    const g = geoCache.current.get(v);
+                    if (g) flash("📍 Location saved with this address");
+                  }}
                   placeholder="Salt Lake, Kolkata"
                   hint="Areas you've used come first; keep typing to search the map. You can also type any address yourself."
                 />
@@ -1319,6 +1405,8 @@ export default function MrDashboard() {
 
               {([
                 ["phone", "Phone", "+91-98300..."],
+                ["secretary_contact", "Chamber / secretary number", "the number that answers during OPD"],
+                ["consultation_timing", "OPD timing", "10 AM - 2 PM"],
                 ["mr_visiting_days", "MR visiting days", "Mon, Wed, Fri"],
                 ["mr_visiting_time", "MR visiting time", "4 PM - 6 PM"],
               ] as [string, string, string][]).map(([k, label, ph]) => (
@@ -1331,8 +1419,10 @@ export default function MrDashboard() {
 
               {/* Consent. Deliberately unchecked by default and worded as a
                   question about a real conversation — a pre-ticked box would
-                  make this a formality instead of a check. */}
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                  make this a formality instead of a check. Not shown when
+                  correcting: consent was recorded when the profile was created
+                  and re-asking would invite a thoughtless re-tick. */}
+              <div className={`rounded-xl border border-amber-200 bg-amber-50 p-3 ${editingId ? "hidden" : ""}`}>
                 <label className="flex cursor-pointer items-start gap-2.5">
                   <input
                     type="checkbox"
@@ -1358,8 +1448,8 @@ export default function MrDashboard() {
               </div>
             </div>
             <div className="mt-5 flex gap-2">
-              <button onClick={() => setShowAdd(false)} className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold">Cancel</button>
-              <button onClick={addDoctor} className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white">Add</button>
+              <button onClick={() => { setShowAdd(false); setEditingId(null); setForm({}); }} className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold">Cancel</button>
+              <button onClick={addDoctor} className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white">{editingId ? "Save changes" : "Add"}</button>
             </div>
           </div>
         </div>

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { guarded } from "@/lib/api";
 import { rateLimit } from "@/lib/rate-limit";
-import { statusFreshness, statusHasQueue } from "@/lib/status-freshness";
+import { statusFreshness, statusHasQueue, timetableFallback } from "@/lib/status-freshness";
 import { istDayKey } from "@/lib/ist";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -34,6 +34,7 @@ function view(d: {
   statusUpdatedByRole: string | null;
   statusUpdatedByName: string | null;
   weeklyTimetable: unknown;
+  consultationTiming: string;
   phone: string;
   secretaryContact: string | null;
 }) {
@@ -48,7 +49,7 @@ function view(d: {
     status_updated_at: d.statusUpdatedAt ? d.statusUpdatedAt.toISOString() : null,
     status_updated_by_name: d.statusUpdatedByName,
     freshness: statusFreshness(d.status, d.statusUpdatedAt, d.statusUpdatedByRole),
-    today_hours: tt?.[istDayKey()] ?? null,
+    today_hours: timetableFallback(tt, istDayKey(), d.consultationTiming),
     // For the PA's share card — the number that answers (desk first). These
     // numbers are public on the directory already; nothing new leaks.
     call_number: (d.secretaryContact ?? "").trim() || (d.phone ?? "").trim() || null,

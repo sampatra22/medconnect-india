@@ -202,6 +202,12 @@ export const POST = guarded(async (request: NextRequest) => {
       consentAt: new Date(),
       consentByName: user.name ?? user.email ?? "Unknown",
       consentNote: clamp(b?.consent_note, 120) || null,
+      // Coordinates from the map lookup, when the MR picked a searched
+      // address. Captured now because re-collecting them later means walking
+      // every chamber again — and Directions depends on having them.
+      ...(Number.isFinite(Number(b?.latitude)) && Number.isFinite(Number(b?.longitude))
+        ? { latitude: Number(b.latitude), longitude: Number(b.longitude) }
+        : {}),
       // The audit trail starts at birth, same pattern as status edits.
       updates: {
         create: {

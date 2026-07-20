@@ -127,6 +127,26 @@ test("timetable fallback returns the day's hours, or null to show nothing", () =
   assert.equal(timetableFallback(null, "mon"), null);
 });
 
+test("fallback drops to general OPD hours when no timetable exists", () => {
+  // 205 of 206 real doctors have no weekly timetable but DO have consulting
+  // hours. Showing those beats "Not confirmed today" over an empty card.
+  assert.equal(timetableFallback(null, "mon", "10 AM - 2 PM"), "10 AM - 2 PM");
+  assert.equal(timetableFallback({}, "mon", "10 AM - 2 PM"), "10 AM - 2 PM");
+  // A day-specific timetable entry is more precise, so it still wins.
+  assert.equal(
+    timetableFallback({ mon: "6 - 9 PM" }, "mon", "10 AM - 2 PM"),
+    "6 - 9 PM"
+  );
+  // Timetable exists but says nothing about today → general hours.
+  assert.equal(
+    timetableFallback({ tue: "6 - 9 PM" }, "mon", "10 AM - 2 PM"),
+    "10 AM - 2 PM"
+  );
+  // Nothing known anywhere stays null — never invent hours.
+  assert.equal(timetableFallback(null, "mon", "   "), null);
+  assert.equal(timetableFallback(null, "mon", null), null);
+});
+
 test("age is phrased identically everywhere", () => {
   assert.equal(describeAge(null), null);
   assert.equal(describeAge(0), "just now");

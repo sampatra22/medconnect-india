@@ -168,17 +168,31 @@ export function liveSince(now: Date = new Date()): Date {
 }
 
 /**
- * What the card should say when a status has gone stale: the doctor's own
- * weekly baseline, clearly labelled as a usual pattern rather than a
- * confirmation. Returns null when there is no timetable to fall back to —
- * in which case the honest answer is to show nothing at all.
+ * What the card should say when a status has gone stale: the doctor's usual
+ * hours, clearly labelled as a pattern rather than a confirmation.
+ *
+ * Two sources, most specific first:
+ *  1. the doctor's own weekly timetable for THIS day — the good data, but
+ *     only a doctor can maintain it, so in practice almost nobody has one;
+ *  2. the profile's general consulting timing — free text like "10 AM – 2 PM",
+ *     entered for every doctor at data entry.
+ *
+ * Before (2) existed here, 205 of 206 doctors fell through to "Not confirmed
+ * today" every morning while their OPD hours sat unused two lines below on the
+ * same card. A weaker answer that is true beats a blank.
+ *
+ * Returns null only when we genuinely know nothing — then showing nothing is
+ * the honest move.
  */
 export function timetableFallback(
   timetable: Record<string, string> | null | undefined,
-  dayKey: string
+  dayKey: string,
+  consultationTiming?: string | null
 ): string | null {
-  const hours = timetable?.[dayKey]?.trim();
-  return hours ? hours : null;
+  const today = timetable?.[dayKey]?.trim();
+  if (today) return today;
+  const general = consultationTiming?.trim();
+  return general ? general : null;
 }
 
 /** "Updated 2 hr ago" — shared so every surface phrases age identically. */

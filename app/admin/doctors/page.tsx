@@ -22,6 +22,7 @@ type PendingDoctor = {
   hospital: string;
   chamber_address: string;
   phone: string;
+  secretary_contact: string | null;
   consultation_timing: string;
   mr_visiting_days: string | null;
   mr_visiting_time: string | null;
@@ -38,6 +39,8 @@ export default function AdminDoctorsPage() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Partial<PendingDoctor>>({});
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -96,6 +99,25 @@ export default function AdminDoctorsPage() {
       return;
     }
     flash("❌ " + (e.error || "Could not approve."));
+  }
+
+  async function saveEdit(d: PendingDoctor) {
+    setBusyId(d.id);
+    const res = await fetch(`/api/doctors/${d.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(draft),
+    });
+    if (res.ok) {
+      const { doctor } = await res.json();
+      setPending((prev) => prev.map((x) => (x.id === d.id ? { ...x, ...doctor } : x)));
+      setEditingId(null);
+      flash(`✏️ ${doctor.name}'s details corrected`);
+    } else {
+      const e = (await res.json().catch(() => ({}))) as { error?: string };
+      flash("❌ " + (e.error || "Could not save."));
+    }
+    setBusyId(null);
   }
 
   async function reject(d: PendingDoctor) {
@@ -195,13 +217,65 @@ export default function AdminDoctorsPage() {
                   )}
                 </div>
 
-                <div className="mt-5 flex gap-2">
+                {editingId === d.id ? (
+                  // Reviewing is exactly when a typo gets noticed, so the fix
+                  // belongs here rather than three screens away.
+                  <div className="mt-4 space-y-2 rounded-xl border border-blue-200 bg-blue-50 p-3">
+                    {(
+                      [
+                        ["name", "Name"],
+                        ["specialty", "Specialty"],
+                        ["qualification", "Qualification"],
+                        ["hospital", "Hospital"],
+                        ["chamber_address", "Chamber address"],
+                        ["phone", "Phone"],
+                        ["secretary_contact", "Chamber / secretary number"],
+                        ["consultation_timing", "OPD timing"],
+                      ] as [keyof PendingDoctor, string][]
+                    ).map(([k, label]) => (
+                      <div key={String(k)}>
+                        <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                          {label}
+                        </label>
+                        <input
+                          value={(draft[k] as string) ?? ""}
+                          onChange={(e) => setDraft({ ...draft, [k]: e.target.value })}
+                          className="h-9 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    ))}
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        disabled={busyId === d.id}
+                        onClick={() => void saveEdit(d)}
+                        className="flex-1 rounded-lg bg-blue-600 py-2 text-sm font-bold text-white disabled:opacity-50"
+                      >
+                        Save corrections
+                      </button>
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="mt-5 flex flex-wrap gap-2">
                   <button
                     disabled={busyId === d.id}
                     onClick={() => void approve(d)}
                     className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
                   >
                     ✓ Approve — make public
+                  </button>
+                  <button
+                    disabled={busyId === d.id}
+                    onClick={() => { setEditingId(editingId === d.id ? null : d.id); setDraft(d); }}
+                    className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    ✏️ Edit
                   </button>
                   <button
                     disabled={busyId === d.id}

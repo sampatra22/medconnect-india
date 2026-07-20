@@ -23,6 +23,9 @@ export type ComboBoxProps = {
   placeholder?: string;
   /** Optional async lookup (e.g. map search) merged below local matches. */
   onSearch?: (q: string) => Promise<string[]>;
+  /** Fired when a suggestion is chosen (not on free typing) — lets the caller
+   *  attach metadata to that choice, e.g. coordinates for a searched address. */
+  onPick?: (v: string) => void;
   /** Shown under the field — e.g. the source of remote results. */
   hint?: string;
   inputClassName?: string;
@@ -34,6 +37,7 @@ export function ComboBox({
   suggestions,
   placeholder,
   onSearch,
+  onPick,
   hint,
   inputClassName,
 }: ComboBoxProps) {
@@ -92,6 +96,7 @@ export function ComboBox({
 
   function pick(v: string) {
     onChange(v);
+    onPick?.(v);
     setOpen(false);
   }
 

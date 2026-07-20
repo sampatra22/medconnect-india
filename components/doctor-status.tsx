@@ -24,6 +24,8 @@ export type StatusFields = {
   status_updated_by_name?: string | null;
   status_updated_by_company?: string | null;
   timetable?: Record<string, string> | null;
+  /** General OPD hours — the fallback when no weekly timetable exists. */
+  consultation_timing?: string | null;
 };
 
 export const STATUS_LABEL: Record<string, string> = {
@@ -98,7 +100,11 @@ export function DoctorStatusBadge({ doctor }: { doctor: StatusFields }) {
   const label = STATUS_LABEL[doctor.status] ?? "Unknown";
 
   if (!f.isLive) {
-    const usual = timetableFallback(doctor.timetable, istDayKey(now));
+    const usual = timetableFallback(
+      doctor.timetable,
+      istDayKey(now),
+      doctor.consultation_timing
+    );
     return (
       <span
         className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full whitespace-nowrap bg-gray-100 text-gray-500"
