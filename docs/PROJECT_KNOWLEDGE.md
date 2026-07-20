@@ -284,3 +284,21 @@ India-first context. Not visionary, not corporate-distant, not
 superlative-stuffed. Emoji in-product only, never in marketing copy. Medical and
 regulatory content stays factual and CDSCO-accurate — hard rule until legal
 review says otherwise.
+
+---
+
+## State at 2026-07-20 (Cowork session)
+
+- **`e98351f` on `main`** — status-trust layer committed: `lib/status-freshness.ts`
+  (+16 unit tests), `components/doctor-status.tsx`, MR **name + company** public
+  attribution (schema + migration `20260719120000_status_attribution_company`),
+  signup collects company, all five surfaces render through the shared badge.
+  `npm run check` green in-session. **Not pushed** — Sam pushes.
+- **⚠ Migration may not be applied to Neon.** The sandbox cannot reach the DB
+  (port 5432 blocked). If `/doctors` 500s, that is why. Fix on-device:
+  `npx prisma migrate deploy` (additive, two nullable columns, no data risk).
+- **Dead files pending deletion:** `data/{doctors,users,visits}.json` — zero code
+  references; `git rm` blocked in the VM (no unlink). Delete locally:
+  `git rm data/doctors.json data/users.json data/visits.json && git commit -m "Remove dead flat-file era data"`
+- **Named next step (awaiting go):** directory over-fetch — `/doctors` loads every
+  doctor's full audit history (206 doctors); trim the query per core rule #2.
