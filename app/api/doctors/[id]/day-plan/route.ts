@@ -126,6 +126,10 @@ export const PUT = guarded(async (
             statusUpdatedById: user.id,
             statusUpdatedByName: user.name ?? null,
             statusUpdatedByRole: user.role,
+            // Explicitly cleared, not left alone: this is the doctor's OWN
+            // confirmation. Inheriting the company of whichever MR last
+            // touched the card would credit a stranger for the doctor's word.
+            statusUpdatedByCompany: null,
           }
         : {}),
       updates: {

@@ -16,10 +16,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const { name, email, password } = await request.json();
+    const { name, email, password, company } = await request.json();
     const cleanName = String(name ?? "").trim().slice(0, 80);
     const cleanEmail = String(email ?? "").toLowerCase().trim().slice(0, 120);
     const pwd = String(password ?? "");
+    // Optional at signup so nobody is blocked from creating an account, but it
+    // is what makes an MR's status update accountable in public attribution.
+    const cleanCompany = String(company ?? "").trim().slice(0, 80);
 
     if (!cleanName || !cleanEmail || !pwd) {
       return NextResponse.json(
@@ -51,8 +54,9 @@ export async function POST(request: Request) {
         email: cleanEmail,
         password: await bcrypt.hash(pwd, 10),
         role: "MEDICAL_REP",
+        company: cleanCompany || null,
       },
-      select: { id: true, name: true, email: true, role: true },
+      select: { id: true, name: true, email: true, role: true, company: true },
     });
     return NextResponse.json({ user }, { status: 201 });
   } catch {

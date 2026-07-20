@@ -29,9 +29,19 @@ Non-negotiable conventions (all exist — reuse, never reinvent):
 - **Concurrency-sensitive writes must be atomic** (e.g. `updateMany` with a
   guard condition, unique constraints) — never check-then-write.
 - **Dates are IST calendar days** ("YYYY-MM-DD") via `lib/ist.ts`.
+- **A live status is a claim with an age, never a standing fact.** How much a
+  status is still worth is decided ONLY in `lib/status-freshness.ts`; render it
+  ONLY through `components/doctor-status.tsx` (or, where a screen has its own
+  visual language, by reading `statusFreshness()` — never by re-deriving the
+  rule). Three screens had each grown a different definition of "fresh" and one
+  of them shipped day-old statuses to WhatsApp; that is why this is a rule.
+  Anything not confirmed-now must not be styled like something confirmed-now —
+  the same applies to the future statistical-projection layer.
 - **API JSON is snake_case** through `lib/serialize.ts` serializers only.
 - Passwords: bcrypt. Security headers: `next.config.ts`. Self-signup creates
   MR accounts only; other roles are admin-created. Doctor accounts link to
   profiles through the one-time atomic claim flow.
 - Prefer boring, proven patterns over clever ones. Small, verifiable steps;
-  run `npx tsc --noEmit` before declaring anything done.
+  run `npm run check` (`tsc --noEmit` + unit tests) before declaring anything
+  done. Pure trust/date logic in `lib/` gets a `*.test.ts` beside it — those
+  rules are too easy to get subtly wrong to leave unasserted.

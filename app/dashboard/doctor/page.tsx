@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
+import { statusFreshness } from "@/lib/status-freshness";
 
 type DayPlanItem = { id: string; time: string; activity: string; done: boolean };
 
@@ -34,6 +35,7 @@ type MyDoctor = {
   timetable: Record<string, string> | null;
   today_plan: TodayPlan | null;
   status_updated_at: string | null;
+  status_updated_by_role: string | null;
 };
 
 type Unclaimed = {
@@ -313,7 +315,19 @@ export default function DoctorDashboard() {
     });
     if (res.ok) {
       const { doctor } = await res.json();
-      setDoc((prev) => (prev ? { ...prev, status: doctor.status } : prev));
+      // Take the confirmation timestamp too, not just the status — otherwise
+      // the "not showing to patients" warning would stay up after the doctor
+      // had already fixed it, which reads as the app ignoring them.
+      setDoc((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: doctor.status,
+              status_updated_at: doctor.status_updated_at,
+              status_updated_by_role: doctor.status_updated_by_role,
+            }
+          : prev
+      );
     } else {
       alert((await res.json()).error || "Update failed.");
     }
@@ -431,6 +445,26 @@ export default function DoctorDashboard() {
                 ) : null}
               </div>
               <div className="mt-4">
+                {/* The decay rule cuts both ways: it protects patients from a
+                    stale promise, and it gives the doctor a concrete reason to
+                    tap once a day — confirmed doctors are the ones patients
+                    can actually find. Say so plainly rather than going quiet. */}
+                {!statusFreshness(
+                  doc.status,
+                  doc.status_updated_at,
+                  doc.status_updated_by_role
+                ).isLive && (
+                  <div className="mb-3 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2">
+                    <p className="text-xs font-semibold text-amber-800">
+                      Your status isn&apos;t showing to patients right now.
+                    </p>
+                    <p className="text-[11px] text-amber-700 mt-0.5">
+                      Availability is only shown on the day it&apos;s confirmed, so
+                      nobody makes a wasted trip. Tap your status below to go live
+                      again — your directory card shows your usual hours until then.
+                    </p>
+                  </div>
+                )}
                 <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
                   My live status (patients &amp; MRs see this now)
                 </p>

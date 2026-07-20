@@ -8,6 +8,7 @@ export default function SignupPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [company, setCompany] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -25,7 +26,7 @@ export default function SignupPage() {
     const res = await fetch("/api/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ name, email, password, company }),
     });
     const data = await res.json();
     setLoading(false);
@@ -65,6 +66,19 @@ export default function SignupPage() {
             required
             className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+          <div>
+            <input
+              type="text"
+              placeholder="Company (e.g. Sun Pharma)"
+              value={company}
+              onChange={(e) => setCompany(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Shown publicly when you confirm a doctor&apos;s status, so your
+              updates carry your name and company. Your phone number stays private.
+            </p>
+          </div>
           <input
             type="password"
             placeholder="Password (min 8 characters)"

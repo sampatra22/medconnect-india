@@ -4,6 +4,12 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { EditorProfile } from "@/components/auth/editor-profile";
 import { rolesWith } from "@/lib/roles";
+import {
+  DoctorStatusBadge,
+  StatusAttribution,
+  STATUS_LABEL,
+} from "@/components/doctor-status";
+import { statusFreshness } from "@/lib/status-freshness";
 
 // Role lists come from the central config in lib/roles.ts — never hard-code them.
 const CAN_STATUS = rolesWith("set_doctor_status");
@@ -51,6 +57,7 @@ type Doctor = {
   status_updated_at: string | null;
   status_updated_by_role: string | null;
   status_updated_by_name?: string | null;
+  status_updated_by_company?: string | null;
   status_updated_by_id?: string | number | null;
   updateHistory?: HistoryEntry[];
   // Module 4: account that owns this profile (claim flow) — gates inline editing
@@ -63,48 +70,16 @@ type Doctor = {
 
 type User = { id: string | number; name: string; email: string; role: string };
 
-const STATUS_CONFIG: Record<
-  Doctor["status"],
-  { label: string; classes: string; dot: string }
-> = {
-  available: {
-    label: "Available",
-    classes: "bg-green-100 text-green-700",
-    dot: "bg-green-500",
-  },
-  busy: {
-    label: "Busy",
-    classes: "bg-orange-100 text-orange-700",
-    dot: "bg-orange-500",
-  },
-  token_full: {
-    label: "Token Full",
-    classes: "bg-purple-100 text-purple-700",
-    dot: "bg-purple-500",
-  },
-  no_mr_today: {
-    label: "No MR Today",
-    classes: "bg-yellow-100 text-yellow-700",
-    dot: "bg-yellow-500",
-  },
-  holiday: {
-    label: "Holiday",
-    classes: "bg-sky-100 text-sky-700",
-    dot: "bg-sky-500",
-  },
-  opd_closed: {
-    label: "OPD Closed",
-    classes: "bg-red-100 text-red-700",
-    dot: "bg-red-500",
-  },
-};
-
-// Never let an unexpected status value crash the public page.
-const STATUS_FALLBACK = {
-  label: "Unknown",
-  classes: "bg-gray-100 text-gray-600",
-  dot: "bg-gray-400",
-};
+// Badge rendering + the trust rules live in components/doctor-status.tsx.
+// This page only needs the option list for the filter and the setter buttons.
+const STATUS_KEYS: Doctor["status"][] = [
+  "available",
+  "busy",
+  "token_full",
+  "no_mr_today",
+  "holiday",
+  "opd_closed",
+];
 
 const ROLE_LABEL: Record<string, string> = {
   medical_representative: "MR",
@@ -121,7 +96,7 @@ function roleLabel(role: string | null | undefined): string {
 
 function formatValue(field: string, value: unknown): string {
   if (field === "status") {
-    return value ? STATUS_CONFIG[value as Doctor["status"]]?.label ?? String(value) : "—";
+    return value ? STATUS_LABEL[value as string] ?? String(value) : "—";
   }
   return value === null || value === undefined ? "—" : String(value);
 }
@@ -266,7 +241,17 @@ export default function DoctorsPage() {
     if (search && !d.name.toLowerCase().includes(search.toLowerCase())) return false;
     if (city !== "all" && cityOf(d) !== city) return false;
     if (specialty !== "all" && d.specialty !== specialty) return false;
-    if (statusFilter !== "all" && d.status !== statusFilter) return false;
+    if (statusFilter !== "all") {
+      // Filtering by status means "is this true NOW". Matching on the raw
+      // field would surface a doctor whose two-day-old status happens to read
+      // "available" — exactly the false promise the badge refuses to make.
+      const live = statusFreshness(
+        d.status,
+        d.status_updated_at,
+        d.status_updated_by_role
+      ).isLive;
+      if (!live || d.status !== statusFilter) return false;
+    }
     return true;
   });
 
@@ -337,8 +322,8 @@ export default function DoctorsPage() {
             className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
           >
             <option value="all">All Statuses</option>
-            {(Object.keys(STATUS_CONFIG) as Doctor["status"][]).map((s) => (
-              <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>
+            {STATUS_KEYS.map((s) => (
+              <option key={s} value={s}>{STATUS_LABEL[s]} now</option>
             ))}
           </select>
         </div>
@@ -364,8 +349,6 @@ export default function DoctorsPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {ranked.map((d) => {
-              const sc = STATUS_CONFIG[d.status] ?? STATUS_FALLBACK;
-              const updated = timeAgo(d.status_updated_at);
               const todayHours = d.timetable?.[istDayKey()] ?? null;
               return (
                 <div key={d.id} className="bg-white rounded-2xl shadow-sm p-5 flex flex-col">
@@ -385,12 +368,7 @@ export default function DoctorsPage() {
                       ) : null}
                     </div>
                     <div className="flex flex-col items-end gap-1">
-                      <span
-                        className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap ${sc.classes}`}
-                      >
-                        <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
-                        {sc.label}
-                      </span>
+                      <DoctorStatusBadge doctor={d} />
                       {user?.role === "admin" && d.verified === false && (
                         <button
                           onClick={() => verifyDoctor(d)}
@@ -410,29 +388,36 @@ export default function DoctorsPage() {
 
                   {/* Patients left + freshness */}
                   <div className="mt-2 min-h-[20px]">
-                    {d.patients_left !== null && (
-                      <span className="text-sm text-gray-700 font-medium">
-                        {d.patients_source === "mr_estimate"
-                          ? `~${d.patients_left} patients left (MR estimate)`
-                          : `${d.patients_left} patients left`}
-                      </span>
-                    )}
-                    {updated && (
+                    {/* A queue length is the most perishable fact on the card —
+                        it is only shown while the status behind it is still
+                        fresh. Yesterday's "3 patients left" is noise. */}
+                    {d.patients_left !== null &&
+                      statusFreshness(
+                        d.status,
+                        d.status_updated_at,
+                        d.status_updated_by_role
+                      ).confidence === "fresh" && (
+                        <span className="text-sm text-gray-700 font-medium block">
+                          {d.patients_source === "mr_estimate"
+                            ? `~${d.patients_left} patients left (MR estimate)`
+                            : `${d.patients_left} patients left`}
+                        </span>
+                      )}
+                    {/* Who stands behind this status, and how old it is.
+                        An MR is named with their company — that pairing is
+                        the accountability, and it renders identically on
+                        every surface via the shared component. */}
+                    <StatusAttribution doctor={d} className="block" />
+                    {/* Signed-in users get the clickable profile of the last
+                        editor on top of the plain-text attribution. */}
+                    {user && d.status_updated_by_name && d.status_updated_by_id != null && (
                       <span className="text-xs text-gray-400 flex items-center gap-1 flex-wrap">
-                        <span>{updated}</span>
-                        {d.status_updated_by_name && d.status_updated_by_id != null ? (
-                          <>
-                            <span>by</span>
-                            <EditorProfile
-                              userId={d.status_updated_by_id}
-                              name={d.status_updated_by_name}
-                              role={d.status_updated_by_role ?? ""}
-                            />
-                            <span>({roleLabel(d.status_updated_by_role)})</span>
-                          </>
-                        ) : d.status_updated_by_role ? (
-                          <span>by {roleLabel(d.status_updated_by_role)}</span>
-                        ) : null}
+                        <EditorProfile
+                          userId={d.status_updated_by_id}
+                          name={d.status_updated_by_name}
+                          role={d.status_updated_by_role ?? ""}
+                        />
+                        <span>({roleLabel(d.status_updated_by_role)})</span>
                       </span>
                     )}
                     {user && (
@@ -581,18 +566,18 @@ export default function DoctorsPage() {
                         Update status
                       </p>
                       <div className="flex flex-wrap gap-1.5">
-                        {(Object.keys(STATUS_CONFIG) as Doctor["status"][]).map((s) => (
+                        {STATUS_KEYS.map((s) => (
                           <button
                             key={s}
                             disabled={updatingId === d.id}
                             onClick={() => updateDoctor(d.id, { status: s })}
                             className={`text-xs font-semibold px-2.5 py-1 rounded-full border transition disabled:opacity-50 ${
                               d.status === s
-                                ? `${STATUS_CONFIG[s].classes} border-transparent`
+                                ? "bg-blue-600 text-white border-transparent"
                                 : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
                             }`}
                           >
-                            {STATUS_CONFIG[s].label}
+                            {STATUS_LABEL[s]}
                           </button>
                         ))}
                       </div>

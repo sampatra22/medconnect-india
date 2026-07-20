@@ -84,6 +84,15 @@ export const PUT = guarded(async (
     return NextResponse.json({ doctor: serializeDoctor(fresh!) });
   }
 
+  // Trust attribution: an MR's word carries their company in public
+  // ("confirmed by Ramesh, Sun Pharma"). Denormalized here rather than joined
+  // at read time so the record stays truthful if the MR later changes company.
+  // Fetched only on the real write path — the no-op case above costs nothing.
+  const editor = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { company: true },
+  });
+
   const updated = await prisma.doctor.update({
     where: { id },
     data: {
@@ -92,6 +101,7 @@ export const PUT = guarded(async (
       statusUpdatedById: user.id,
       statusUpdatedByName: user.name ?? null,
       statusUpdatedByRole: user.role,
+      statusUpdatedByCompany: editor?.company ?? null,
       updates: {
         create: {
           userId: user.id,

@@ -8,6 +8,7 @@ import type {
   PlanItem,
   Visit,
 } from "@prisma/client";
+import { statusFreshness } from "@/lib/status-freshness";
 
 // ─── Module 5 · Call MR ─────────────────────────────────────────────────────
 export function serializeCallRequest(c: CallRequest) {
@@ -77,6 +78,12 @@ export function serializeDoctor(
     status_updated_by_role: d.statusUpdatedByRole,
     status_updated_by_name: d.statusUpdatedByName,
     status_updated_by_id: d.statusUpdatedById,
+    // Public only in this attribution context — the accountability signal.
+    status_updated_by_company: d.statusUpdatedByCompany ?? null,
+    // Module 4 · the trust verdict, computed server-side in ONE place.
+    // Shipping this alongside the raw fields means a client can never render a
+    // stale status as live by forgetting to apply the rule itself.
+    freshness: statusFreshness(d.status, d.statusUpdatedAt, d.statusUpdatedByRole),
     updateHistory: (d.updates ?? []).map((u) => ({
       timestamp: u.createdAt.toISOString(),
       user_id: u.userId,

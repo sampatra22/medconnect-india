@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --experimental-strip-types --disable-warning=ExperimentalWarning --import ./scripts/alias-hook-register.mjs --test \"lib/**/*.test.ts\"",
+    "check": "tsc --noEmit && npm run test"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

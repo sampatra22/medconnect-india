@@ -19,11 +19,17 @@ enum Role {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      Role
+  id       String @id @default(cuid())
+  email    String @unique
+  password String
+  name     String
+  role     Role
+  // Module 4 · trust attribution. For an MR this is their pharma company
+  // ("Sun Pharma"). It is deliberately PUBLIC: when an MR confirms a doctor's
+  // status the directory shows "confirmed by Ramesh, Sun Pharma", which is the
+  // accountability mechanism — a name with a company behind it is answerable.
+  // Phone and every other MR field stay private (see MR profile spec).
+  company   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -55,6 +61,9 @@ model Doctor {
   statusUpdatedById   String?
   statusUpdatedByName String?
   statusUpdatedByRole String?
+  // Denormalized at write time (same pattern as Visit/DoctorUpdate) so the
+  // attribution stays readable even if the MR later changes company or leaves.
+  statusUpdatedByCompany String?
   // Module 4: recurring baseline hours, edited by the doctor only.
   // JSON object keyed by day: { "mon": "10 AM – 1 PM, 6 – 9 PM", ... }
   weeklyTimetable     Json?

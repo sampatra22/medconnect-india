@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { SosButton } from "@/components/sos-button";
+import { statusFreshness, describeAge } from "@/lib/status-freshness";
 
 type Doctor = {
   id: number | string;
@@ -25,6 +26,7 @@ type Doctor = {
   status_updated_at?: string | null;
   status_updated_by_role?: string | null;
   status_updated_by_name?: string | null;
+  status_updated_by_company?: string | null;
   // Module 4: doctor-shared availability layers
   timetable?: Record<string, string> | null;
   today_plan?: {
@@ -116,24 +118,31 @@ const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const pad = (n: number) => (n < 10 ? "0" + n : "" + n);
 const initials = (name: string) => name.replace(/^Dr\.?\s*/i, "").split(/\s+/).slice(0, 2).map((s) => s[0] || "").join("");
 
+/** Elapsed time for non-status timestamps (call requests), phrased app-wide. */
 function timeAgo(iso?: string | null) {
   if (!iso) return "";
-  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 60) return "just now";
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
+  return describeAge(Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000))) ?? "";
+}
+
+/** Trust verdict from the one shared engine — never a local re-implementation. */
+function freshnessOf(d?: Doctor | null) {
+  return statusFreshness(d?.status, d?.status_updated_at, d?.status_updated_by_role);
 }
 
 // "Genuine status" rule: always show how fresh the status is and WHO set it —
-// by name. Every MR can see who last updated, so false inputs are caught fast.
+// by name, and for an MR their company too. Every MR sees who last updated,
+// so a careless or false input is caught by the people who work that patch.
 function freshness(d?: Doctor | null) {
-  if (!d?.status_updated_at) return "";
-  const role = d.status_updated_by_role ? ROLE_LABEL[d.status_updated_by_role] || d.status_updated_by_role : "";
-  const by = d.status_updated_by_name ? `${d.status_updated_by_name}${role ? ` (${role})` : ""}` : role;
-  return `${timeAgo(d.status_updated_at)}${by ? " by " + by : ""}`;
+  const f = freshnessOf(d);
+  if (f.ageMinutes === null) return "";
+  const role = d?.status_updated_by_role
+    ? ROLE_LABEL[d.status_updated_by_role] || d.status_updated_by_role
+    : "";
+  const who = [d?.status_updated_by_name, d?.status_updated_by_company]
+    .filter(Boolean)
+    .join(", ");
+  const by = who ? `${who}${role ? ` (${role})` : ""}` : role;
+  return `${describeAge(f.ageMinutes)}${by ? " by " + by : ""}`;
 }
 
 function Stat({ label, value, sub, tone }: { label: string; value: number | string; sub: string; tone: string }) {
@@ -149,9 +158,44 @@ function Stat({ label, value, sub, tone }: { label: string; value: number | stri
 
 function StatusBadge({ d, small }: { d?: Doctor | null; small?: boolean }) {
   const sm = statusMeta(d?.status);
+  const f = freshnessOf(d);
+  const size = small ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-xs";
+
+  // An MR routes their whole day off this badge. Showing yesterday's
+  // "Available" in confident green sends them across town for nothing —
+  // the same rule the public directory follows, in this dashboard's palette.
+  if (!f.isLive) {
+    return (
+      <span
+        className={`inline-flex items-center gap-1 rounded-full font-semibold ring-1 bg-slate-100 text-slate-500 ring-slate-200 ${size}`}
+        title={
+          f.confirmedOn
+            ? `Last confirmed ${f.confirmedOn} — treat as unknown.`
+            : "Never confirmed."
+        }
+      >
+        ○ Not confirmed today
+      </span>
+    );
+  }
+  // Tailwind ring utilities have no dashed variant, so a second-hand report is
+  // drawn with a dashed BORDER instead of the solid ring a confirmed status gets.
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full font-bold ring-1 ${sm.cls} ${small ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-xs"}`}>
-      ● {sm.label}
+    <span
+      className={`inline-flex items-center gap-1 rounded-full font-bold ${size} ${
+        f.confidence === "ageing" ? "opacity-70" : ""
+      } ${
+        f.isVerifiedSource
+          ? `ring-1 ${sm.cls}`
+          : "border border-dashed border-slate-400 bg-white text-slate-600"
+      }`}
+      title={
+        f.isVerifiedSource
+          ? "Confirmed by the doctor or their clinic."
+          : "Reported by an MR — not confirmed by the doctor."
+      }
+    >
+      {f.isVerifiedSource ? "●" : "◌"} {sm.label}
     </span>
   );
 }
@@ -397,12 +441,17 @@ export default function MrDashboard() {
     const prevPatch: Partial<Doctor> = {
       status: d.status, status_updated_at: d.status_updated_at,
       status_updated_by_role: d.status_updated_by_role, status_updated_by_name: d.status_updated_by_name,
+      status_updated_by_company: d.status_updated_by_company,
     };
     patchDoctorEverywhere(d.id, {
       status,
       status_updated_at: new Date().toISOString(),
       status_updated_by_role: "mr",
       status_updated_by_name: mr.name || "MR",
+      // Cleared, not left as-is: the card may still hold the PREVIOUS editor's
+      // company, and pairing this MR's name with another company — even for
+      // the second before the server replies — is a false attribution.
+      status_updated_by_company: null,
     });
     try {
       const res = await fetch(`/api/doctors/${d.id}/status`, {
@@ -704,7 +753,7 @@ export default function MrDashboard() {
                         <div className="mt-1 flex flex-wrap items-center gap-2">
                           <StatusBadge d={d} small />
                           <PlanChip d={d} />
-                          {typeof d?.patients_left === "number" ? <span className="text-[11px] text-slate-500">👥 {d.patients_left} left</span> : null}
+                          {typeof d?.patients_left === "number" && freshnessOf(d).confidence === "fresh" ? <span className="text-[11px] text-slate-500">👥 {d.patients_left} left</span> : null}
                           {fresh ? <span className="text-[11px] text-slate-400">· {fresh}</span> : null}
                         </div>
                       </div>
@@ -913,7 +962,7 @@ export default function MrDashboard() {
                           <StatusBadge d={d} />
                           {fresh ? <span className="text-[11px] text-slate-400">{fresh}</span> : null}
                         </span>
-                        {typeof d.patients_left === "number" ? <span className="text-xs text-slate-500">👥 {d.patients_left} left</span> : null}
+                        {typeof d.patients_left === "number" && freshnessOf(d).confidence === "fresh" ? <span className="text-xs text-slate-500">👥 {d.patients_left} left</span> : null}
                       </div>
                       <div className="flex gap-2">
                         <button disabled={done} onClick={() => markVisit(d)}

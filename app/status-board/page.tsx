@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { statusFreshness, describeAge } from "@/lib/status-freshness";
+import { istDayKey } from "@/lib/ist";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WhatsApp Status Board — Phase 1's marketing engine (~15 min/day, ₹0 budget).
@@ -26,7 +28,15 @@ type Doctor = {
     | "opd_closed";
   patients_left: number | null;
   status_updated_at: string | null;
+  status_updated_by_role: string | null;
+  status_updated_by_name?: string | null;
+  status_updated_by_company?: string | null;
 };
+
+/** The board's trust verdict comes from the same engine as every other screen. */
+function freshnessOf(d: Doctor) {
+  return statusFreshness(d.status, d.status_updated_at, d.status_updated_by_role);
+}
 
 const STATUS_META: Record<
   Doctor["status"],
@@ -51,26 +61,10 @@ function cityOf(d: Doctor): string {
   return parts[parts.length - 1].trim();
 }
 
-function istDayKey(): string {
-  return new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Kolkata", weekday: "short" })
-    .format(new Date())
-    .toLowerCase();
-}
-
-function freshWithin24h(iso: string | null): boolean {
-  if (!iso) return false;
-  return Date.now() - new Date(iso).getTime() < 24 * 60 * 60 * 1000;
-}
-
-function timeAgo(iso: string | null): string {
-  if (!iso) return "";
-  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.round(hrs / 24)}d ago`;
-}
+// NOTE: this page used to keep its own "fresh = within 24 hours" rule. That
+// quietly disagreed with the rest of the app: a status set at 6 PM Monday
+// still counted as fresh at 10 AM Tuesday and would go out on WhatsApp as
+// today's news. Freshness now comes from lib/status-freshness.ts only.
 
 const MAX_IN_MESSAGE = 15;
 
@@ -111,12 +105,10 @@ export default function StatusBoardPage() {
     });
   }, [doctors, city]);
 
-  // The message only carries statuses updated in the last 24h — stale info
-  // shared on WhatsApp would burn trust in the whole board.
-  const freshList = useMemo(
-    () => inCity.filter((d) => freshWithin24h(d.status_updated_at)),
-    [inCity]
-  );
+  // The message only carries statuses confirmed TODAY (IST). A WhatsApp post
+  // is the one place a stale status cannot be walked back — once it is in the
+  // group, it is someone's wasted trip.
+  const freshList = useMemo(() => inCity.filter((d) => freshnessOf(d).isLive), [inCity]);
 
   const now = new Date().toLocaleString("en-IN", {
     timeZone: "Asia/Kolkata",
@@ -135,9 +127,17 @@ export default function StatusBoardPage() {
     const included = freshList.slice(0, MAX_IN_MESSAGE);
     const lines = included.map((d) => {
       const m = meta(d.status);
+      const f = freshnessOf(d);
       const extras = [
-        typeof d.patients_left === "number" ? `~${d.patients_left} patients left` : null,
+        // A queue length only means something while it is still current.
+        typeof d.patients_left === "number" && f.confidence === "fresh"
+          ? `~${d.patients_left} patients left`
+          : null,
         d.timetable?.[istDayKey()] ? `today ${d.timetable[istDayKey()]}` : null,
+        // Say plainly whose word this is. A reader forwarding this message is
+        // vouching for it, so they deserve to know what they are vouching for.
+        f.isVerifiedSource ? null : "MR-reported",
+        f.confidence === "ageing" && f.asOf ? `as of ${f.asOf}` : null,
       ]
         .filter(Boolean)
         .join(" · ");
@@ -149,7 +149,7 @@ export default function StatusBoardPage() {
       "",
       ...(lines.length > 0
         ? lines
-        : ["No status updates in the last 24 hours yet — check live:"]),
+        : ["No doctor has confirmed their status today yet — check live:"]),
       "",
       `Live updates & timings: ${siteUrl}`,
       `— MedConnect India`,
@@ -250,8 +250,8 @@ export default function StatusBoardPage() {
                 </button>
               </div>
               <p className="mt-2 text-[11px] text-gray-400">
-                Only statuses updated in the last 24 hours are shared — stale
-                info stays off WhatsApp.
+                Only statuses confirmed today are shared, and anything an MR
+                reported is labelled as such — stale info stays off WhatsApp.
               </p>
             </div>
 
@@ -264,10 +264,15 @@ export default function StatusBoardPage() {
               ) : (
                 inCity.map((d) => {
                   const m = meta(d.status);
-                  const fresh = freshWithin24h(d.status_updated_at);
+                  const f = freshnessOf(d);
                   return (
                     <div key={d.id} className="flex items-center gap-3 px-4 py-3">
-                      <span className="text-lg flex-none">{m.emoji}</span>
+                      {/* A stale row is visually demoted to a hollow marker so
+                          the board reads at a glance as "confirmed today" vs
+                          "we simply don't know right now". */}
+                      <span className={`text-lg flex-none ${f.isLive ? "" : "opacity-30"}`}>
+                        {f.isLive ? m.emoji : "⚪"}
+                      </span>
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-gray-800 truncate text-sm">
                           {d.name}
@@ -279,12 +284,24 @@ export default function StatusBoardPage() {
                       </div>
                       <div className="text-right flex-none">
                         <span
-                          className={`inline-block text-xs font-semibold px-2.5 py-1 rounded-full ${m.classes}`}
+                          className={`inline-block text-xs px-2.5 py-1 rounded-full ${
+                            f.isLive
+                              ? `font-semibold ${m.classes}${
+                                  f.confidence === "ageing" ? " opacity-70" : ""
+                                }`
+                              : "font-medium bg-gray-100 text-gray-500"
+                          }`}
                         >
-                          {m.label}
+                          {f.isLive ? m.label : "Not confirmed today"}
                         </span>
-                        <p className={`text-[11px] mt-0.5 ${fresh ? "text-emerald-600" : "text-gray-400"}`}>
-                          {d.status_updated_at ? timeAgo(d.status_updated_at) : "never updated"}
+                        <p
+                          className={`text-[11px] mt-0.5 ${
+                            f.confidence === "fresh" ? "text-emerald-600" : "text-gray-400"
+                          }`}
+                        >
+                          {f.ageMinutes === null
+                            ? "never updated"
+                            : `${f.isVerifiedSource ? "" : "MR · "}${describeAge(f.ageMinutes)}`}
                         </p>
                       </div>
                     </div>
