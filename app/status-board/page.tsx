@@ -83,6 +83,7 @@ export default function StatusBoardPage() {
   const [city, setCity] = useState("all");
   const [area, setArea] = useState("all");
   const [copied, setCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -97,10 +98,27 @@ export default function StatusBoardPage() {
   }
 
   useEffect(() => {
+    // /status-board?city=Kolkata&area=Salt+Lake — each WhatsApp group can
+    // bookmark its own beat's board. Read on mount (not useSearchParams, no
+    // Suspense boundary needed), mirrored back below on every chip change.
+    const sp = new URLSearchParams(window.location.search);
+    const c = sp.get("city");
+    const a = sp.get("area");
+    if (c) setCity(c);
+    if (a) setArea(a);
     void (async () => {
       await load();
     })();
   }, []);
+
+  // Keep the address bar sharable: the URL always names the current slice.
+  useEffect(() => {
+    const sp = new URLSearchParams();
+    if (city !== "all") sp.set("city", city);
+    if (area !== "all") sp.set("area", area);
+    const qs = sp.toString();
+    window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
+  }, [city, area]);
 
   const cities = useMemo(
     () => Array.from(new Set(doctors.map(cityOf))).sort(),
@@ -212,6 +230,18 @@ export default function StatusBoardPage() {
     }
   }
 
+  // The board link IS the recurring entry point: pin it in the group once,
+  // and every day's statuses are one tap away without a fresh message.
+  async function copyBoardLink() {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      /* clipboard blocked — the address bar has the same link */
+    }
+  }
+
   return (
     <div className="min-h-screen bg-blue-50">
       <div className="max-w-3xl mx-auto px-4 py-8">
@@ -318,6 +348,13 @@ export default function StatusBoardPage() {
                   className="flex-1 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 py-3 text-sm font-bold text-slate-700"
                 >
                   {copied ? "✓ Copied" : "📋 Copy text"}
+                </button>
+                <button
+                  onClick={copyBoardLink}
+                  title="Link to this board with the current city/area — pin it in the group"
+                  className="flex-1 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 py-3 text-sm font-bold text-slate-700"
+                >
+                  {linkCopied ? "✓ Link copied" : "🔗 Copy board link"}
                 </button>
               </div>
               <p className="mt-2 text-[11px] text-gray-400">

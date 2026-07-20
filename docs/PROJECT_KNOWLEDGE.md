@@ -304,6 +304,9 @@ review says otherwise.
 - **Dead files pending deletion:** `data/{doctors,users,visits}.json` — zero code
   references; `git rm` blocked in the VM (no unlink). Delete locally:
   `git rm data/doctors.json data/users.json data/visits.json && git commit -m "Remove dead flat-file era data"`
+- **Done 2026-07-20 (4):** board is bookmarkable per beat —
+  `/status-board?city=…&area=…` read on mount, chips mirror into the URL
+  (replaceState), "🔗 Copy board link" button. Pin one link per WhatsApp group.
 - **Done 2026-07-20 (3):** Status Board targets the beat, not the city — area
   chips (second-to-last address segment, e.g. "Salt Lake"), message header
   "Doctor Status — Salt Lake, Kolkata", "…and N more confirmed today" when the
