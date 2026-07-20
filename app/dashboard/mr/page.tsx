@@ -5,6 +5,8 @@ import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { SosButton } from "@/components/sos-button";
 import { statusFreshness, describeAge } from "@/lib/status-freshness";
+import { ComboBox } from "@/components/combo-box";
+import { rankSuggestions, SPECIALTIES, QUALIFICATIONS } from "@/lib/medical-vocab";
 
 type Doctor = {
   id: number | string;
@@ -259,6 +261,17 @@ export default function MrDashboard() {
   const [pickerSearch, setPickerSearch] = useState("");
   const [detail, setDetail] = useState<Doctor | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
+  // Data-entry vocabulary: curated lists merged with what the directory already
+  // holds, so suggestions reflect real local practice. Loaded once when the
+  // add-doctor form is first opened — not on page load, since most sessions
+  // never add a doctor.
+  const [vocab, setVocab] = useState<{
+    specialties: string[];
+    qualifications: string[];
+    addresses: string[];
+    hospitals: string[];
+  }>({ specialties: [...SPECIALTIES], qualifications: [...QUALIFICATIONS], addresses: [], hospitals: [] });
+  const vocabLoaded = useRef(false);
   const [calMonth, setCalMonth] = useState(new Date());
   const [selDate, setSelDate] = useState(istToday());
   // Module 5 · Call MR — incoming call requests (doctor name + when + note)
@@ -270,6 +283,29 @@ export default function MrDashboard() {
   const today = istToday();
   // Directory deletion is admin-only (server-enforced too); hide the button for MRs.
   const isAdmin = ((session?.user as { role?: string } | undefined)?.role || "") === "admin";
+
+  // Open the create-doctor form, pulling the suggestion vocabulary the first
+  // time. Failure is silent and harmless — the curated defaults still work.
+  async function openAddDoctor(prefillName?: string) {
+    setShowAdd(true);
+    if (prefillName) setForm((f) => ({ ...f, name: prefillName }));
+    if (vocabLoaded.current) return;
+    vocabLoaded.current = true;
+    try {
+      const r = await fetch("/api/vocab", { cache: "no-store" });
+      if (r.ok) setVocab(await r.json());
+    } catch {
+      /* curated defaults remain */
+    }
+  }
+
+  // Free map lookup for chamber addresses (OpenStreetMap via our own proxy).
+  async function searchAddress(q: string): Promise<string[]> {
+    const r = await fetch(`/api/geo/search?q=${encodeURIComponent(q)}`, { cache: "no-store" });
+    if (!r.ok) return [];
+    const { results } = (await r.json()) as { results: { label: string }[] };
+    return results.map((x) => x.label);
+  }
 
   async function loadDoctors() {
     // per=500: the planner needs the whole directory in one call (206 today).
@@ -925,12 +961,20 @@ export default function MrDashboard() {
                 <option value="todo">To visit today</option>
                 <option value="done">Visited today</option>
               </select>
-              <button onClick={() => setShowAdd(true)} className="h-11 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm">＋ Add Doctor</button>
+              <button onClick={() => void openAddDoctor()} className="h-11 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm">＋ New doctor (not in list)</button>
             </div>
             <div className="mb-3 text-xs text-slate-500">Showing {filtered.length} of {doctors.length} doctors</div>
 
             {filtered.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center text-slate-400">No doctors match.</div>
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center text-slate-400">
+                <p>No doctors match.</p>
+                <button
+                  onClick={() => void openAddDoctor(search.trim())}
+                  className="mt-3 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white"
+                >
+                  ＋ Add {search.trim() ? `"${search.trim()}"` : "a new doctor"} to the directory
+                </button>
+              </div>
             ) : (
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                 {filtered.map((d) => {
@@ -1041,8 +1085,17 @@ export default function MrDashboard() {
               className="mb-3 h-11 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none focus:border-blue-500" />
             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
               {pickerDoctors.length === 0 ? (
+                // The dead end IS the moment of need: an MR searching for a
+                // doctor who isn't listed should be one tap from creating them,
+                // not sent hunting through tabs for the right button.
                 <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-400">
-                  {doctors.length === 0 ? "No doctors in your list yet — add them on the Doctors tab." : "No doctors match (or they're already planned)."}
+                  <p>{doctors.length === 0 ? "No doctors in your list yet." : "No doctors match (or they're already planned)."}</p>
+                  <button
+                    onClick={() => { setShowPicker(false); void openAddDoctor(pickerSearch.trim()); }}
+                    className="mt-3 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white"
+                  >
+                    ＋ Add {pickerSearch.trim() ? `"${pickerSearch.trim()}"` : "a new doctor"} to the directory
+                  </button>
                 </div>
               ) : pickerDoctors.map((d) => (
                 <div key={d.id} className="flex items-center gap-3 rounded-xl border border-slate-200 p-3">
@@ -1195,13 +1248,59 @@ export default function MrDashboard() {
           <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
             <div className="mb-1 text-lg font-bold">Add Doctor</div>
             <div className="mb-4 text-sm text-slate-500">Goes straight onto your list, credited to you — and appears publicly once an admin verifies it.</div>
+            {/* Suggested fields keep the directory's vocabulary consistent —
+                three characters should land a canonical value — but every one
+                of them still accepts free text for the case the list misses. */}
             <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-500">Doctor name *</label>
+                <input value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Dr. Ananya Sen"
+                  className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-blue-500" />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-500">Specialty</label>
+                <ComboBox
+                  value={form.specialty || ""}
+                  onChange={(v) => setForm({ ...form, specialty: v })}
+                  suggestions={rankSuggestions(vocab.specialties, form.specialty || "")}
+                  placeholder="Type 'ort' → Orthopedics"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-500">Qualification</label>
+                <ComboBox
+                  value={form.qualification || ""}
+                  onChange={(v) => setForm({ ...form, qualification: v })}
+                  suggestions={rankSuggestions(vocab.qualifications, form.qualification || "")}
+                  placeholder="Type 'md' or 'dnb'"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-500">Hospital</label>
+                <ComboBox
+                  value={form.hospital || ""}
+                  onChange={(v) => setForm({ ...form, hospital: v })}
+                  suggestions={rankSuggestions(vocab.hospitals, form.hospital || "")}
+                  placeholder="Apollo, Kolkata"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-500">Chamber address</label>
+                <ComboBox
+                  value={form.chamber_address || ""}
+                  onChange={(v) => setForm({ ...form, chamber_address: v })}
+                  suggestions={rankSuggestions(vocab.addresses, form.chamber_address || "", 5)}
+                  onSearch={searchAddress}
+                  placeholder="Salt Lake, Kolkata"
+                  hint="Areas you've used come first; keep typing to search the map. You can also type any address yourself."
+                />
+              </div>
+
               {([
-                ["name", "Doctor name *", "Dr. Ananya Sen"],
-                ["specialty", "Specialty", "Cardiology"],
-                ["qualification", "Qualification", "MBBS, MD"],
-                ["hospital", "Hospital", "Apollo, Kolkata"],
-                ["chamber_address", "Chamber address", "Salt Lake, Kolkata"],
                 ["phone", "Phone", "+91-98300..."],
                 ["mr_visiting_days", "MR visiting days", "Mon, Wed, Fri"],
                 ["mr_visiting_time", "MR visiting time", "4 PM - 6 PM"],

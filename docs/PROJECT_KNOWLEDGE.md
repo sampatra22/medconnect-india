@@ -304,6 +304,23 @@ review says otherwise.
 - **Dead files pending deletion:** `data/{doctors,users,visits}.json` — zero code
   references; `git rm` blocked in the VM (no unlink). Delete locally:
   `git rm data/doctors.json data/users.json data/visits.json && git commit -m "Remove dead flat-file era data"`
+- **Done 2026-07-21 (8): typed-entry quality on Add Doctor.**
+  `components/combo-box.tsx` — suggests but NEVER restricts (free text always
+  wins; native `<datalist>` rejected: no async merge, inconsistent on Android).
+  `lib/medical-vocab.ts` — curated India specialty/qualification lists +
+  `rankSuggestions` (prefix > word-start > contains; 6 unit tests, "ort" →
+  Orthopedics). `GET /api/vocab` merges those lists with values already in the
+  directory, so vocabulary grows with field use (add_doctor roles only).
+  `GET /api/geo/search` proxies **OpenStreetMap Nominatim** (free, no key, no
+  billing; India-only, 4s timeout, rate-limited, required User-Agent set) —
+  verified good Kolkata coverage. Swapping to Google Places later = this one
+  file. **Discoverability fix:** the create button was invisible because it sat
+  on the third tab labelled "＋ Add Doctor" while two other tabs had "＋ Add
+  Doctors" (pickers for EXISTING doctors). Renamed to "＋ New doctor (not in
+  list)" and surfaced at the dead end — empty search results now offer
+  `＋ Add "<what you typed>" to the directory`, prefilling the name.
+  **Still missing here: the consent checkbox** (pre-launch blocker 2).
+
 ## Pre-launch checklist (raised 2026-07-21)
 
 Launch splits in two. **A one-chamber field pilot needs none of the below** —
