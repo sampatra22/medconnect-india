@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { LoginModal } from "@/components/auth/login-modal";
+import { SiteFooter } from "@/components/site-footer";
 import { Stethoscope, Search, MapPin, Clock, BadgeCheck } from "lucide-react";
 
 // Simplified homepage: one job for the public (find a doctor, see live
@@ -133,23 +134,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Footer — only links that exist */}
-      <footer className="mt-auto">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-slate-500">
-          <p className="flex items-center gap-2">
-            <Stethoscope className="h-4 w-4 text-blue-500" />
-            © 2026 MedConnect India · Kolkata, West Bengal
-          </p>
-          <div className="flex items-center gap-4">
-            <Link href="/doctors" className="hover:text-blue-600">Doctor Directory</Link>
-            <Link href="/status-board" className="hover:text-blue-600">Status Board</Link>
-            <Link href="/login" className="hover:text-blue-600">Login</Link>
-            <a href="mailto:support@medconnectindia.com" className="hover:text-blue-600">
-              support@medconnectindia.com
-            </a>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </main>
   );
 }

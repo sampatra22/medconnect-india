@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local build artifacts left by the Claude bridge VM (mount blocks unlink)
+.next.stale.*
+node_modules/.prisma/client.stale.*

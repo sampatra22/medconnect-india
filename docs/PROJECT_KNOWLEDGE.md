@@ -304,6 +304,38 @@ review says otherwise.
 - **Dead files pending deletion:** `data/{doctors,users,visits}.json` — zero code
   references; `git rm` blocked in the VM (no unlink). Delete locally:
   `git rm data/doctors.json data/users.json data/visits.json && git commit -m "Remove dead flat-file era data"`
+## Pre-launch checklist (raised 2026-07-21)
+
+Launch splits in two. **A one-chamber field pilot needs none of the below** —
+one PA, one known doctor. **Before any patient who isn't a personal contact
+sees the site**, these are blockers:
+
+- 🔲 **BLOCKER 1 — production holds 206 SEED doctors.** Fake names/numbers
+  (Dr. Rajesh Kumar, Delhi/Mumbai/Pune). A patient tapping Call reaches a
+  stranger — the exact wasted trip the product exists to prevent. Purge to
+  only field-verified doctors before patient traffic, even if that's 12.
+  (`prisma/seed.mjs`, `seed-demo.mjs` created these.)
+- 🔲 **BLOCKER 2 — no doctor consent capture, no takedown UI.** Real names,
+  chamber addresses and phones are published. DPDP Act 2023 applies; the
+  sharper risk is relational (one angry doctor = a lost territory). Needs a
+  consent step in the MR add-doctor flow. Email takedown path now exists
+  (see below) but it is manual.
+- ✅ **Legal pages — DONE 2026-07-21.** `/privacy`, `/terms` (medical
+  disclaimer leads, in amber), shared `components/site-footer.tsx` on home,
+  `/doctors`, `/status-board` carrying the short disclaimer + removal path.
+  Contact address centralized in `lib/contact.ts` (override with
+  `NEXT_PUBLIC_CONTACT_EMAIL`) — **it must be an inbox Sam reads; a bouncing
+  takedown address is worse than none.** Old footer pointed at
+  support@medconnectindia.com, which does not exist.
+- ✅ **Share metadata — DONE 2026-07-21.** OG/Twitter tags + generated
+  `app/opengraph-image.tsx` card, `robots.ts` (disallows `/update/`, dashboards,
+  APIs), `sitemap.ts`. Site description repositioned patient-first. Set
+  `NEXT_PUBLIC_SITE_URL` on Vercel if the domain changes.
+- 🔲 Can wait: in-memory rate limiting (per-instance on serverless), no CSP,
+  no analytics.
+
+---
+
 - **Done 2026-07-20 (7): per-doctor share card.** `lib/doctor-share.ts`
   (React-free, 3 unit tests): live status speaks in present tense with queue
   count (fresh only, "~" = MR estimate); stale falls back to "Usually today:

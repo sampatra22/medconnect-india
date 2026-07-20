@@ -11,6 +11,7 @@ import {
 } from "@/components/doctor-status";
 import { statusFreshness } from "@/lib/status-freshness";
 import { doctorShareMessage } from "@/lib/doctor-share";
+import { SiteFooter } from "@/components/site-footer";
 
 // Role lists come from the central config in lib/roles.ts — never hard-code them.
 const CAN_STATUS = rolesWith("set_doctor_status");
@@ -810,6 +811,9 @@ export default function DoctorsPage() {
           </div>
         )}
       </div>
+      {/* Public page: the disclaimer and the doctor-removal path must be
+          reachable from wherever a patient actually lands. */}
+      <SiteFooter />
     </div>
   );
 }

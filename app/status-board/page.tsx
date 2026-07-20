@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { statusFreshness, describeAge } from "@/lib/status-freshness";
 import { istDayKey } from "@/lib/ist";
+import { SiteFooter } from "@/components/site-footer";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WhatsApp Status Board — Phase 1's marketing engine (~15 min/day, ₹0 budget).
@@ -420,6 +421,7 @@ export default function StatusBoardPage() {
           </>
         )}
       </div>
+      <SiteFooter />
     </div>
   );
 }
