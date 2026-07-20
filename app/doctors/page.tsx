@@ -299,6 +299,32 @@ export default function DoctorsPage() {
     setHistoryLoadingId(null);
   }
 
+  // PA update link: create (or rotate) this doctor's no-login status link and
+  // put it on the clipboard, ready to hand to the chamber. Rotation is the
+  // revocation mechanism — a new link kills the old one instantly.
+  async function copyPaLink(d: Doctor) {
+    if (
+      !confirm(
+        `Create a PA update link for ${d.name}?\n\nAnyone holding the link can set this doctor's live status (nothing else). Creating a new link disables any older one.`
+      )
+    )
+      return;
+    const res = await fetch(`/api/doctors/${d.id}/status-key`, { method: "POST" });
+    if (!res.ok) {
+      const e = (await res.json().catch(() => ({}))) as { error?: string };
+      alert(e.error || "Could not create the link.");
+      return;
+    }
+    const { path } = (await res.json()) as { path: string };
+    const url = `${window.location.origin}${path}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      alert(`PA link copied — paste it to the chamber's WhatsApp:\n\n${url}`);
+    } catch {
+      alert(`PA link (copy it manually):\n\n${url}`);
+    }
+  }
+
   // Module 6: admin approves an MR-added profile -> visible to everyone.
   async function verifyDoctor(d: Doctor) {
     if (!user || user.role !== "admin") return;
@@ -676,6 +702,15 @@ export default function DoctorsPage() {
                           </button>
                         </div>
                       )}
+                      {/* PA update link: the field move that keeps THIS card
+                          fresh daily — MR generates it in the chamber, PA
+                          bookmarks it, no account needed. */}
+                      <button
+                        onClick={() => void copyPaLink(d)}
+                        className="mt-3 text-xs text-blue-600 hover:underline"
+                      >
+                        🔗 PA update link — hand to the chamber
+                      </button>
                     </div>
                   )}
                 </div>

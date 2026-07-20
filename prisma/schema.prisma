@@ -77,6 +77,13 @@ model Doctor {
   addedByName         String?
   addedByRole         String?
   verified            Boolean        @default(true)
+  // PA update link (approved 2026-07-20): a secret embedded in a private URL
+  // that lets the chamber (PA / compounder / the doctor) set THIS doctor's
+  // live status with no account — the only way chamber staff will ever update
+  // daily. Scope: status + patients only. Null = no link issued. Issuing a
+  // new key (or revoking) kills the old link instantly. Never serialized.
+  statusKey           String?        @unique
+  statusKeyIssuedAt   DateTime?
   visits              Visit[]
   updates             DoctorUpdate[]
   planItems           PlanItem[]

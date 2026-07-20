@@ -304,6 +304,18 @@ review says otherwise.
 - **Dead files pending deletion:** `data/{doctors,users,visits}.json` — zero code
   references; `git rm` blocked in the VM (no unlink). Delete locally:
   `git rm data/doctors.json data/users.json data/visits.json && git commit -m "Remove dead flat-file era data"`
+- **Done 2026-07-20 (5): PA update link** (approved trade-off: possession of
+  link = authorization). `Doctor.statusKey` (unique, nullable, never
+  serialized) + migration `20260720190000_pa_status_update_link` (**apply
+  before deploying** — new Prisma client selects the column). Issue/rotate/
+  revoke: `POST|DELETE /api/doctors/[id]/status-key` (set_doctor_status roles,
+  doctor-own rule; rotation = revocation). Public: `/update/[key]` page +
+  `GET|PUT /api/status-link/[key]` — status + patients only, rate-limited
+  per-key AND per-IP, atomic updateMany on the key, attributes as
+  `clinic_staff` ("Chamber staff"), audit row per change. MR flow: directory
+  card → "PA update link" → confirm → link on clipboard → hand to PA.
+  Next per Sam's answers: tap-to-call number-that-answers, then per-doctor
+  share card.
 - **DEPLOYED 2026-07-20: https://medconnect-india.vercel.app is LIVE.**
   Vercel project `medconnect-india` (team sampatra22s-projects), git-connected,
   auto-deploys `main`. Env vars in Vercel: `DATABASE_URL`, `AUTH_SECRET`
