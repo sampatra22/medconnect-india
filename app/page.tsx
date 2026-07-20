@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { LoginModal } from "@/components/auth/login-modal";
+import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { Stethoscope, Search, MapPin, Clock, BadgeCheck } from "lucide-react";
+import { MrDoorCta } from "@/components/mr-door-cta";
+import { Search, MapPin, Clock, BadgeCheck } from "lucide-react";
 
 // Simplified homepage: one job for the public (find a doctor, see live
 // status) and one clear door for MRs (log in → dashboard). No fake stats,
@@ -10,33 +11,7 @@ import { Stethoscope, Search, MapPin, Clock, BadgeCheck } from "lucide-react";
 export default function Home() {
   return (
     <main className="min-h-screen bg-white dark:bg-slate-950 flex flex-col">
-      {/* Header */}
-      <header className="border-b border-slate-200 dark:border-slate-800 sticky top-0 bg-white/80 dark:bg-slate-950/80 backdrop-blur z-50">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
-          <Link href="/" className="flex items-center gap-2">
-            <Stethoscope className="h-6 w-6 text-blue-600" />
-            <span className="text-lg font-bold text-slate-900 dark:text-white">
-              MedConnect <span className="text-emerald-600">India</span>
-            </span>
-          </Link>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <Link
-              href="/doctors"
-              className="text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600 px-2"
-            >
-              Doctors
-            </Link>
-            <LoginModal />
-            <Button
-              className="bg-blue-600 hover:bg-blue-700"
-              nativeButton={false}
-              render={<Link href="/signup" />}
-            >
-              Sign Up
-            </Button>
-          </div>
-        </div>
-      </header>
+      <SiteHeader />
 
       {/* Hero: one headline, one search box */}
       <section className="bg-gradient-to-b from-blue-50 to-white dark:from-slate-900 dark:to-slate-950">
@@ -124,13 +99,7 @@ export default function Home() {
               and track your monthly calls — free.
             </p>
           </div>
-          <Button
-            className="bg-emerald-600 hover:bg-emerald-700 shrink-0"
-            nativeButton={false}
-            render={<Link href="/login" />}
-          >
-            MR Login →
-          </Button>
+          <MrDoorCta />
         </div>
       </section>
 

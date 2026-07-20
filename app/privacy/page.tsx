@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { SiteFooter } from "@/components/site-footer";
+import { SiteHeader } from "@/components/site-header";
 import { CONTACT_EMAIL } from "@/lib/contact";
 
 export const metadata: Metadata = {
@@ -16,11 +16,9 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
   return (
     <main className="min-h-screen bg-white flex flex-col">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10 flex-1">
-        <Link href="/" className="text-sm font-semibold text-blue-700 hover:underline">
-          ← MedConnect India
-        </Link>
-        <h1 className="text-3xl font-bold text-blue-800 mt-4">Privacy Policy</h1>
+      <SiteHeader />
+      <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 py-10 flex-1">
+        <h1 className="text-3xl font-bold text-blue-800">Privacy Policy</h1>
         <p className="text-sm text-slate-400 mt-1">Last updated 21 July 2026</p>
 
         <div className="prose prose-slate mt-6 space-y-6 text-[15px] leading-relaxed text-slate-700">

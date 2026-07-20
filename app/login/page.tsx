@@ -1,15 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
+import { homeFor } from "@/lib/roles";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { data: session, status } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Already signed in? Asking someone to log in again is a dead end — send
+  // them where they were going.
+  useEffect(() => {
+    if (status === "authenticated") {
+      const role = String((session?.user as { role?: string } | undefined)?.role || "");
+      router.replace(homeFor(role));
+    }
+  }, [status, session, router]);
 
   async function handleLogin(e?: React.FormEvent) {
     e?.preventDefault();
@@ -31,9 +42,10 @@ export default function LoginPage() {
     const role = String(session?.user?.role || "").toLowerCase();
 
     setLoading(false);
-    if (role === "mr") router.push("/dashboard/mr");
-    else if (role === "admin") router.push("/admin/users");
-    else router.push("/dashboard");
+    // Landing pages come from the central role config — hard-coding them here
+    // is how this page ended up sending admins to /admin/users after the admin
+    // home moved to the approvals queue. One source of truth, per AGENTS.md.
+    router.push(homeFor(role));
     router.refresh();
   }
 

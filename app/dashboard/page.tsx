@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
+import { homeFor } from "@/lib/roles";
 
 export default function Dashboard() {
   const router = useRouter();
@@ -12,14 +13,18 @@ export default function Dashboard() {
     | { name?: string | null; email?: string | null; role?: string }
     | undefined;
 
+  // Roles with a dashboard of their own get sent there; everyone else sees the
+  // generic card below. Destinations come from the central role config so this
+  // can't drift when a role's home moves (it already did once, for admin).
+  const ownHome = user?.role ? homeFor(user.role) : "";
+  const hasOwnHome = !!ownHome && ownHome !== "/dashboard";
+
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
-    else if (user?.role === "mr") router.replace("/dashboard/mr");
-    else if (user?.role === "doctor") router.replace("/dashboard/doctor");
-  }, [status, user?.role, router]);
+    else if (hasOwnHome) router.replace(ownHome);
+  }, [status, hasOwnHome, ownHome, router]);
 
-  if (status !== "authenticated" || !user || user.role === "mr" || user.role === "doctor")
-    return null;
+  if (status !== "authenticated" || !user || hasOwnHome) return null;
 
   return (
     <div className="min-h-screen bg-blue-50 flex items-center justify-center px-4 py-10">

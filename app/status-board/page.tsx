@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { statusFreshness, describeAge } from "@/lib/status-freshness";
 import { istDayKey } from "@/lib/ist";
 import { SiteFooter } from "@/components/site-footer";
+import { SiteHeader } from "@/components/site-header";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WhatsApp Status Board — Phase 1's marketing engine (~15 min/day, ₹0 budget).
@@ -244,15 +245,9 @@ export default function StatusBoardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-blue-50">
-      <div className="max-w-3xl mx-auto px-4 py-8">
-        <a
-          href="/"
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-700 hover:underline mb-4"
-        >
-          ← MedConnect India
-        </a>
-
+    <div className="min-h-screen bg-blue-50 flex flex-col">
+      <SiteHeader />
+      <div className="max-w-3xl mx-auto w-full px-4 py-8 flex-1">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-blue-800">

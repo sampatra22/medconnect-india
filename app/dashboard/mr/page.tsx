@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { SosButton } from "@/components/sos-button";
@@ -670,12 +671,19 @@ export default function MrDashboard() {
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/80 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4">
-          <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-blue-600 to-emerald-500 font-bold text-white">✚</div>
-          <div className="leading-tight">
-            <div className="text-[11px] font-medium text-slate-500">MedConnect India</div>
-            <div className="font-bold">MR Dashboard</div>
-          </div>
+          {/* The brand is the way back to the public site — people expect the
+              logo to be a home link, and this dashboard had no exit at all. */}
+          <Link href="/" className="flex items-center gap-3" title="Go to the public site">
+            <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-blue-600 to-emerald-500 font-bold text-white">✚</div>
+            <div className="leading-tight">
+              <div className="text-[11px] font-medium text-slate-500">MedConnect India</div>
+              <div className="font-bold">MR Dashboard</div>
+            </div>
+          </Link>
           <div className="flex-1" />
+          <Link href="/doctors" className="hidden sm:inline rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">
+            👁 Public view
+          </Link>
           <div className="text-sm text-slate-600">Hi, <span className="font-semibold text-slate-900">{mr.name || "MR"}</span> 👋</div>
           <button onClick={() => signOut({ callbackUrl: "/login" })} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-50">Log out</button>
         </div>

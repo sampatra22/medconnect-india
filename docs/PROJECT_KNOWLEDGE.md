@@ -321,6 +321,24 @@ review says otherwise.
   `＋ Add "<what you typed>" to the directory`, prefilling the name.
   **Still missing here: the consent checkbox** (pre-launch blocker 2).
 
+- **Fixed 2026-07-21 (11): auth-state bugs across public pages.** Reported:
+  signed in as admin, the homepage still offered "Log in / Sign Up", showed no
+  identity, and gave no way back. Root cause: every public page rendered its
+  own header and none knew about the session. Fixes:
+  `components/site-header.tsx` — ONE session-aware header (identity chip +
+  role → their dashboard, Log out; skeleton while the session resolves so it
+  never flashes "Log in" at a signed-in user). Applied to home, `/doctors`,
+  `/status-board`, `/privacy`, `/terms` (all previously dead-ended on a
+  "← MedConnect India" text link). `components/mr-door-cta.tsx` — the
+  homepage's "MR Login →" becomes "Go to my dashboard →" when signed in.
+  Swept for the same class and found more: **`/login` hard-coded admins to
+  `/admin/users`**, silently contradicting the admin-home move (now uses
+  `homeFor()`, per AGENTS.md's no-hard-coded-roles rule); `/login` and
+  `/signup` did not bounce an already-signed-in user; `/dashboard` hard-coded
+  its role redirects the same way; the MR dashboard had NO exit to the public
+  site (brand is now a home link + "👁 Public view", matching the doctor
+  dashboard which already had one).
+
 - **Fixed 2026-07-21 (10): "OPD Closed · 3 patients left".** A queue survived
   a status change to a non-sitting status — nothing ever cleared
   `patientsLeft`. Contradictions like this cost trust on the one surface whose

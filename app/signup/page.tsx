@@ -1,10 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { homeFor } from "@/lib/roles";
 
 export default function SignupPage() {
   const router = useRouter();
+  const { data: session, status } = useSession();
+
+  // Offering "create an account" to someone who is signed in is the same dead
+  // end as the login page had.
+  useEffect(() => {
+    if (status === "authenticated") {
+      const role = String((session?.user as { role?: string } | undefined)?.role || "");
+      router.replace(homeFor(role));
+    }
+  }, [status, session, router]);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

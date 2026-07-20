@@ -12,6 +12,7 @@ import {
 import { statusFreshness } from "@/lib/status-freshness";
 import { doctorShareMessage } from "@/lib/doctor-share";
 import { SiteFooter } from "@/components/site-footer";
+import { SiteHeader } from "@/components/site-header";
 
 // Role lists come from the central config in lib/roles.ts — never hard-code them.
 const CAN_STATUS = rolesWith("set_doctor_status");
@@ -417,12 +418,9 @@ export default function DoctorsPage() {
   const ranked = [...doctors].sort((a, b) => sharesToday(b) - sharesToday(a));
 
   return (
-    <div className="min-h-screen bg-blue-50">
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Way back home for public visitors landing from search */}
-        <a href="/" className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-700 hover:underline mb-4">
-          ← MedConnect India
-        </a>
+    <div className="min-h-screen bg-blue-50 flex flex-col">
+      <SiteHeader />
+      <div className="max-w-6xl mx-auto w-full px-4 py-8 flex-1">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
           <div>
