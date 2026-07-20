@@ -272,10 +272,12 @@ export default function MrDashboard() {
   const isAdmin = ((session?.user as { role?: string } | undefined)?.role || "") === "admin";
 
   async function loadDoctors() {
-    const r = await fetch("/api/doctors", { cache: "no-store" });
-    if (!r.ok) return; // 401/403/500 bodies are {error} objects, never arrays
+    // per=500: the planner needs the whole directory in one call (206 today).
+    // The endpoint pages by default for the public directory view.
+    const r = await fetch("/api/doctors?per=500", { cache: "no-store" });
+    if (!r.ok) return; // 401/403/500 bodies are {error} objects
     const data = await r.json();
-    if (Array.isArray(data)) setDoctors(data);
+    if (Array.isArray(data?.doctors)) setDoctors(data.doctors);
   }
   async function loadPlan() {
     const r = await fetch("/api/plan", { cache: "no-store" });

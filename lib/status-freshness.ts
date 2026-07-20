@@ -1,4 +1,4 @@
-import { istClock, istDay } from "@/lib/ist";
+import { istClock, istDay, istDayStartUtc } from "@/lib/ist";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Module 4 · Status confidence — the trust rule for the whole platform.
@@ -140,6 +140,18 @@ export function statusFreshness(
   return ageMinutes <= FRESH_MINUTES
     ? { ...base, confidence: "fresh", isLive: true }
     : { ...base, confidence: "ageing", isLive: true };
+}
+
+/**
+ * The isLive rule expressed as a database bound: a status is live exactly when
+ * `statusUpdatedAt >= liveSince(now)` — i.e. confirmed within today's IST day.
+ * This exists so a WHERE clause (e.g. the directory's "available now" filter)
+ * can apply the trust rule without re-deriving it. If the day-boundary rule in
+ * `statusFreshness` ever changes, this must change with it — the unit tests
+ * assert the two agree at the boundary.
+ */
+export function liveSince(now: Date = new Date()): Date {
+  return istDayStartUtc(now);
 }
 
 /**

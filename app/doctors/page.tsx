@@ -129,11 +129,6 @@ function timeAgo(iso: string | null): string | null {
   return `Updated ${Math.round(hrs / 24)} day(s) ago`;
 }
 
-function cityOf(d: Doctor): string {
-  const parts = d.chamber_address.split(",");
-  return parts[parts.length - 1].trim();
-}
-
 // ── Module 4: doctor-shared timetable & day plan helpers ──────────────────
 const DAY_ORDER = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const DAY_SHORT: Record<string, string> = {
@@ -160,9 +155,21 @@ export default function DoctorsPage() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  // Search hits the server now — debounced so we query once per pause in
+  // typing, not once per keystroke.
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [city, setCity] = useState("all");
   const [specialty, setSpecialty] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  // Server-side paging: the page holds only what has been loaded so far.
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  // Filter options come from the server (page 1), covering ALL doctors —
+  // deriving them from loaded pages would shrink the dropdowns to one slice.
+  const [cities, setCities] = useState<string[]>([]);
+  const [specialties, setSpecialties] = useState<string[]>([]);
   const [updatingId, setUpdatingId] = useState<Doctor["id"] | null>(null);
   const [historyOpenId, setHistoryOpenId] = useState<Doctor["id"] | null>(null);
   // Lazy-loaded audit history. The list payload no longer carries history for
@@ -182,26 +189,75 @@ export default function DoctorsPage() {
     canUpdateStatus &&
     (user!.role !== "doctor" || (d.user_id ?? null) === String(user!.id));
 
-  async function loadDoctors() {
+  type DoctorsResponse = {
+    doctors: Doctor[];
+    total: number;
+    page: number;
+    per: number;
+    has_more: boolean;
+    cities?: string[];
+    specialties?: string[];
+  };
+
+  async function fetchPage(p: number): Promise<DoctorsResponse | null> {
+    const sp = new URLSearchParams();
+    if (debouncedSearch.trim()) sp.set("q", debouncedSearch.trim());
+    if (city !== "all") sp.set("city", city);
+    if (specialty !== "all") sp.set("specialty", specialty);
+    if (statusFilter !== "all") sp.set("status", statusFilter);
+    sp.set("page", String(p));
+    const res = await fetch(`/api/doctors?${sp.toString()}`);
+    if (!res.ok) return null;
+    return (await res.json()) as DoctorsResponse;
+  }
+
+  async function loadFirstPage() {
     setLoading(true);
-    const res = await fetch("/api/doctors");
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data)) setDoctors(data);
+    const data = await fetchPage(1);
+    if (data) {
+      setDoctors(data.doctors);
+      setPage(1);
+      setHasMore(data.has_more);
+      setTotal(data.total);
+      if (data.cities) setCities(data.cities);
+      if (data.specialties) setSpecialties(data.specialties);
     }
     setLoading(false);
+  }
+
+  async function loadMore() {
+    setLoadingMore(true);
+    const data = await fetchPage(page + 1);
+    if (data) {
+      setDoctors((prev) => [...prev, ...data.doctors]);
+      setPage(data.page);
+      setHasMore(data.has_more);
+      setTotal(data.total);
+    }
+    setLoadingMore(false);
   }
 
   useEffect(() => {
     // Homepage search lands here as /doctors?q=… — pre-fill the search box.
     // Read on mount (not useSearchParams) to avoid a Suspense boundary.
     const q = new URLSearchParams(window.location.search).get("q");
-    if (q) setSearch(q);
-    // Async wrapper keeps setState out of the effect body (react-hooks/set-state-in-effect).
-    void (async () => {
-      await loadDoctors();
-    })();
+    if (q) {
+      setSearch(q);
+      setDebouncedSearch(q); // skip the debounce delay on a deep link
+    }
   }, []);
+
+  // One keystroke pause = one server query.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Any filter change restarts from page 1. Also runs on mount (initial load).
+  useEffect(() => {
+    void loadFirstPage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, city, specialty, statusFilter]);
 
   async function updateDoctor(
     id: Doctor["id"],
@@ -258,33 +314,15 @@ export default function DoctorsPage() {
     setUpdatingId(null);
   }
 
-  const cities = Array.from(new Set(doctors.map(cityOf))).sort();
-  const specialties = Array.from(new Set(doctors.map((d) => d.specialty))).sort();
-
-  const filtered = doctors.filter((d) => {
-    if (search && !d.name.toLowerCase().includes(search.toLowerCase())) return false;
-    if (city !== "all" && cityOf(d) !== city) return false;
-    if (specialty !== "all" && d.specialty !== specialty) return false;
-    if (statusFilter !== "all") {
-      // Filtering by status means "is this true NOW". Matching on the raw
-      // field would surface a doctor whose two-day-old status happens to read
-      // "available" — exactly the false promise the badge refuses to make.
-      const live = statusFreshness(
-        d.status,
-        d.status_updated_at,
-        d.status_updated_by_role
-      ).isLive;
-      if (!live || d.status !== statusFilter) return false;
-    }
-    return true;
-  });
+  // Search, filters and the "available NOW" trust rule are applied by the
+  // server (GET /api/doctors) — the browser never holds more than it shows.
 
   // Module 4 incentive, delivered: doctors who shared today's plan rank first.
   // Sharing → top of the directory → more patient walk-ins. (Stable sort keeps
-  // the original order within each group.)
+  // the original order within each group; applies to the pages loaded so far.)
   const sharesToday = (d: Doctor) =>
     d.today_plan && (d.today_plan.items.length > 0 || d.today_plan.started_at) ? 1 : 0;
-  const ranked = [...filtered].sort((a, b) => sharesToday(b) - sharesToday(a));
+  const ranked = [...doctors].sort((a, b) => sharesToday(b) - sharesToday(a));
 
   return (
     <div className="min-h-screen bg-blue-50">
@@ -304,7 +342,7 @@ export default function DoctorsPage() {
             </p>
           </div>
           <button
-            onClick={loadDoctors}
+            onClick={() => void loadFirstPage()}
             className="self-start sm:self-auto bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
           >
             ↻ Refresh Status
@@ -366,7 +404,7 @@ export default function DoctorsPage() {
               <div key={i} className="bg-white rounded-2xl shadow-sm p-5 animate-pulse h-64" />
             ))}
           </div>
-        ) : filtered.length === 0 ? (
+        ) : doctors.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-sm p-10 text-center text-gray-500">
             No doctors match these filters.
           </div>
@@ -643,6 +681,24 @@ export default function DoctorsPage() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Paging: fetch the next slice only when someone asks for it. */}
+        {!loading && doctors.length > 0 && (
+          <div className="mt-6 flex flex-col items-center gap-2">
+            <p className="text-xs text-gray-400">
+              Showing {doctors.length} of {total} doctors
+            </p>
+            {hasMore && (
+              <button
+                onClick={() => void loadMore()}
+                disabled={loadingMore}
+                className="bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 text-sm font-semibold px-6 py-2 rounded-lg transition disabled:opacity-50"
+              >
+                {loadingMore ? "Loading…" : "Load more doctors"}
+              </button>
+            )}
           </div>
         )}
       </div>

@@ -41,6 +41,15 @@ export function istToday(): string {
   return istDay(new Date());
 }
 
+/**
+ * The UTC instant when the given instant's IST calendar day began (IST
+ * midnight). IST is a fixed +05:30 offset with no DST, so this is exact
+ * arithmetic — safe to use in database comparisons against UTC timestamps.
+ */
+export function istDayStartUtc(d: Date = new Date()): Date {
+  return new Date(`${istDay(d)}T00:00:00+05:30`);
+}
+
 /** Current IST wall-clock time, e.g. "10:15 AM". */
 export function istTimeNow(): string {
   return istClock(new Date());

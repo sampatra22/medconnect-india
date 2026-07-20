@@ -304,6 +304,12 @@ review says otherwise.
 - **Dead files pending deletion:** `data/{doctors,users,visits}.json` — zero code
   references; `git rm` blocked in the VM (no unlink). Delete locally:
   `git rm data/doctors.json data/users.json data/visits.json && git commit -m "Remove dead flat-file era data"`
+- **Done 2026-07-20 (2):** directory search/filter/paging moved server-side —
+  `GET /api/doctors` takes `q/city/specialty/status/page/per` (default 24,
+  cap 500), returns `{ doctors, total, page, per, has_more }` + `cities`/
+  `specialties` facets on page 1. "Available now" uses `liveSince()` — the
+  trust rule's own DB bound in `lib/status-freshness.ts` (tested). Status
+  board + MR dashboard fetch `?per=500` and read `.doctors`.
 - **Done 2026-07-20:** directory over-fetch fixed — the `/api/doctors` list no
   longer joins 20 audit rows per doctor (~4,000 rows at 206 doctors); history
   (which carries editor emails) is now signed-in-only via a new

@@ -76,10 +76,12 @@ export default function StatusBoardPage() {
 
   async function load() {
     setLoading(true);
-    const res = await fetch("/api/doctors", { cache: "no-store" });
+    // per=500: the board digests EVERY fresh status into one message, so it
+    // needs the full set (206 today), not the directory's first page.
+    const res = await fetch("/api/doctors?per=500", { cache: "no-store" });
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data)) setDoctors(data);
+      if (Array.isArray(data?.doctors)) setDoctors(data.doctors);
     }
     setLoading(false);
   }
