@@ -294,9 +294,13 @@ review says otherwise.
   attribution (schema + migration `20260719120000_status_attribution_company`),
   signup collects company, all five surfaces render through the shared badge.
   `npm run check` green in-session. **Not pushed** — Sam pushes.
-- **⚠ Migration may not be applied to Neon.** The sandbox cannot reach the DB
-  (port 5432 blocked). If `/doctors` 500s, that is why. Fix on-device:
-  `npx prisma migrate deploy` (additive, two nullable columns, no data risk).
+- **Migration CONFIRMED applied to Neon** (checked in console 2026-07-20:
+  `_prisma_migrations` row finished 2026-07-19; `Doctor.statusUpdatedByCompany`
+  present). DB healthy, 206 doctors. **`migrate deploy` is NOT needed.**
+  Sam's local P1001 = his network blocking outbound TCP 5432 (console over
+  HTTPS works fine) — test with:
+  `Test-NetConnection ep-hidden-mouse-afot2zle-pooler.c-2.us-west-2.aws.neon.tech -Port 5432`,
+  and try a phone hotspot / disable VPN-firewall if it fails.
 - **Dead files pending deletion:** `data/{doctors,users,visits}.json` — zero code
   references; `git rm` blocked in the VM (no unlink). Delete locally:
   `git rm data/doctors.json data/users.json data/visits.json && git commit -m "Remove dead flat-file era data"`
