@@ -332,11 +332,19 @@ sees the site**, these are blockers:
   stranger — the exact wasted trip the product exists to prevent. Purge to
   only field-verified doctors before patient traffic, even if that's 12.
   (`prisma/seed.mjs`, `seed-demo.mjs` created these.)
-- 🔲 **BLOCKER 2 — no doctor consent capture, no takedown UI.** Real names,
-  chamber addresses and phones are published. DPDP Act 2023 applies; the
-  sharper risk is relational (one angry doctor = a lost territory). Needs a
-  consent step in the MR add-doctor flow. Email takedown path now exists
-  (see below) but it is manual.
+- ✅ **BLOCKER 2 — consent capture DONE 2026-07-21.** Migration
+  `20260721120000_doctor_listing_consent` (**apply before deploying**):
+  `consentGiven/At/ByName/Note` on Doctor, all nullable. MR form has a required
+  unticked amber checkbox ("The doctor agreed to be listed") + optional "who
+  said yes" note; `POST /api/doctors` **rejects** without `consent_given: true`
+  (not defaulted — a silent true would be a lie, a silent false would create
+  unapprovable profiles). Approval is gated server-side in the verify route:
+  no consent → 409 `needs_consent`; an admin may still approve via
+  `confirm_consent: true`, which records consent under THEIR name in the audit
+  trail. Pending cards show "✓ Consent recorded — <who>" or "⚠ No consent
+  recorded" before the Approve button. **The 206 seed doctors all have NULL
+  consent** — which is correct: they're fake and shouldn't be approved anyway
+  (blocker 1). Takedown path remains the email route in /privacy + /terms.
 - ✅ **Legal pages — DONE 2026-07-21.** `/privacy`, `/terms` (medical
   disclaimer leads, in amber), shared `components/site-footer.tsx` on home,
   `/doctors`, `/status-board` carrying the short disclaimer + removal path.

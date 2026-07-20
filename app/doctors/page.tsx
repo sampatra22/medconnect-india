@@ -68,6 +68,9 @@ type Doctor = {
   verified?: boolean;
   added_by_name?: string | null;
   added_by_role?: string | null;
+  // Consent to be listed — visible to signed-in staff, gates admin approval.
+  consent_given?: boolean | null;
+  consent_by_name?: string | null;
 };
 
 type User = { id: string | number; name: string; email: string; role: string };
@@ -368,15 +371,36 @@ export default function DoctorsPage() {
   }
 
   // Module 6: admin approves an MR-added profile -> visible to everyone.
-  async function verifyDoctor(d: Doctor) {
+  async function verifyDoctor(d: Doctor, confirmConsent = false) {
     if (!user || user.role !== "admin") return;
     setUpdatingId(d.id);
-    const res = await fetch(`/api/doctors/${d.id}/verify`, { method: "PUT" });
+    const res = await fetch(`/api/doctors/${d.id}/verify`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(confirmConsent ? { confirm_consent: true } : {}),
+    });
     if (res.ok) {
       const { doctor } = await res.json();
       setDoctors((prev) => prev.map((x) => (x.id === doctor.id ? doctor : x)));
     } else {
-      const e = (await res.json().catch(() => ({}))) as { error?: string };
+      const e = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        needs_consent?: boolean;
+      };
+      // Profiles predating the consent rule (or entered without it) stop here.
+      // The admin can still approve, but must vouch explicitly — and that
+      // vouching is recorded against their name in the audit trail.
+      if (e.needs_consent) {
+        setUpdatingId(null);
+        if (
+          confirm(
+            `${d.name} has no recorded consent.\n\nMaking this public publishes their name, chamber and phone number. Only continue if you know the doctor agreed — this confirmation is recorded under your name.\n\nApprove anyway?`
+          )
+        ) {
+          await verifyDoctor(d, true);
+        }
+        return;
+      }
       alert(e.error || "Could not verify.");
     }
     setUpdatingId(null);
@@ -498,6 +522,19 @@ export default function DoctorsPage() {
                       {/* Attribution is MR-internal — hide from the public */}
                       {user && d.added_by_name ? (
                         <p className="text-[11px] text-gray-400 mt-0.5">Added by {d.added_by_name} ({roleLabel(d.added_by_role)})</p>
+                      ) : null}
+                      {/* Consent state — the admin approving needs to see what
+                          they are vouching for, before they click. */}
+                      {user?.role === "admin" && d.verified === false ? (
+                        <p
+                          className={`text-[11px] mt-0.5 ${
+                            d.consent_given ? "text-emerald-600" : "text-amber-600 font-semibold"
+                          }`}
+                        >
+                          {d.consent_given
+                            ? `✓ Consent recorded${d.consent_by_name ? ` — ${d.consent_by_name}` : ""}`
+                            : "⚠ No consent recorded"}
+                        </p>
                       ) : null}
                     </div>
                     <div className="flex flex-col items-end gap-1">

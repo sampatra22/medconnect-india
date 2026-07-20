@@ -618,7 +618,16 @@ export default function MrDashboard() {
   }
   async function addDoctor() {
     if (!form.name || !form.name.trim()) { flash("Enter a doctor name"); return; }
-    const res = await fetch("/api/doctors", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+    if (form.consent !== "yes") { flash("Please confirm the doctor agreed to be listed"); return; }
+    const res = await fetch("/api/doctors", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...form,
+        consent_given: true,
+        consent_note: form.consent_note || "",
+      }),
+    });
     if (res.ok) {
       const created = (await res.json()) as Doctor;
       setShowAdd(false); setForm({});
@@ -1311,6 +1320,34 @@ export default function MrDashboard() {
                     className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-blue-500" />
                 </div>
               ))}
+
+              {/* Consent. Deliberately unchecked by default and worded as a
+                  question about a real conversation — a pre-ticked box would
+                  make this a formality instead of a check. */}
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                <label className="flex cursor-pointer items-start gap-2.5">
+                  <input
+                    type="checkbox"
+                    checked={form.consent === "yes"}
+                    onChange={(e) => setForm({ ...form, consent: e.target.checked ? "yes" : "" })}
+                    className="mt-0.5 h-4 w-4 flex-none accent-amber-600"
+                  />
+                  <span className="text-xs leading-relaxed text-amber-900">
+                    <strong>The doctor agreed to be listed.</strong> We publish
+                    their name, chamber address and phone number publicly, so
+                    please ask before adding them — the doctor or their PA can
+                    say yes.
+                  </span>
+                </label>
+                {form.consent === "yes" ? (
+                  <input
+                    value={form.consent_note || ""}
+                    onChange={(e) => setForm({ ...form, consent_note: e.target.value })}
+                    placeholder="Who said yes? e.g. 'PA Ramesh, in person' (optional)"
+                    className="mt-2 h-9 w-full rounded-lg border border-amber-200 bg-white px-3 text-xs outline-none focus:border-amber-500"
+                  />
+                ) : null}
+              </div>
             </div>
             <div className="mt-5 flex gap-2">
               <button onClick={() => setShowAdd(false)} className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold">Cancel</button>

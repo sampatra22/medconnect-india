@@ -157,6 +157,21 @@ export const POST = guarded(async (request: NextRequest) => {
     }
   }
 
+  // Consent to be listed. Required at entry — the person filling this form is
+  // the only one who knows whether the doctor actually agreed, and asking
+  // later never happens. Rejected rather than defaulted: a silent false would
+  // create profiles that can never be approved, and a silent true would be a
+  // lie about a real person's data.
+  if (b?.consent_given !== true) {
+    return NextResponse.json(
+      {
+        error:
+          "Please confirm the doctor agreed to be listed. We publish their name, chamber and phone number publicly.",
+      },
+      { status: 400 }
+    );
+  }
+
   // Admin entries are trusted immediately; MR entries wait for approval.
   const verified = user.role === "admin";
 
@@ -183,6 +198,10 @@ export const POST = guarded(async (request: NextRequest) => {
       addedByName: user.name ?? user.email ?? "Unknown",
       addedByRole: user.role,
       verified,
+      consentGiven: true,
+      consentAt: new Date(),
+      consentByName: user.name ?? user.email ?? "Unknown",
+      consentNote: clamp(b?.consent_note, 120) || null,
       // The audit trail starts at birth, same pattern as status edits.
       updates: {
         create: {

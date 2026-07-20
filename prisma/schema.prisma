@@ -77,6 +77,17 @@ model Doctor {
   addedByName         String?
   addedByRole         String?
   verified            Boolean        @default(true)
+  // Consent to be listed (2026-07-21). We publish a doctor's name, chamber
+  // and phone; the doctor must have agreed. Recorded at data entry by the
+  // person who spoke to them, because that is the only moment anyone actually
+  // knows. An unverified profile cannot be approved without it — that gate is
+  // enforced server-side in the verify route, not just hidden in the UI.
+  // Nullable: profiles created before this rule keep NULL and are treated as
+  // "not recorded" (admin must confirm before approving).
+  consentGiven        Boolean?
+  consentAt           DateTime?
+  consentByName       String? // who obtained it, denormalized like other attributions
+  consentNote         String? // e.g. "verbal, via PA" / "chamber board"
   // PA update link (approved 2026-07-20): a secret embedded in a private URL
   // that lets the chamber (PA / compounder / the doctor) set THIS doctor's
   // live status with no account — the only way chamber staff will ever update

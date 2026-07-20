@@ -70,6 +70,11 @@ export function serializeDoctor(
     added_by_id: d.addedById ?? null,
     added_by_name: d.addedByName ?? null,
     added_by_role: d.addedByRole ?? null,
+    // Consent state — shown to signed-in staff so an admin can see what they
+    // are vouching for. The note and who obtained it stay internal; only the
+    // boolean shape is exposed here.
+    consent_given: d.consentGiven ?? null,
+    consent_by_name: d.consentByName ?? null,
     timetable: (d.weeklyTimetable ?? null) as Record<string, string> | null,
     today_plan: d.dayPlans && d.dayPlans[0] ? serializeDayPlan(d.dayPlans[0]) : null,
     patients_left: d.patientsLeft,
