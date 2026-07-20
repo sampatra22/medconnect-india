@@ -30,7 +30,9 @@ export const ROLE_CONFIG: Record<string, RoleConfig> = {
   admin: {
     db: "ADMIN",
     label: "Admin",
-    home: "/admin/users",
+    // Approvals are the time-sensitive admin job — an MR-added doctor stays
+    // invisible to the public until it is cleared. User management is not.
+    home: "/admin/doctors",
     permissions: [
       "manage_users",
       "set_doctor_status",

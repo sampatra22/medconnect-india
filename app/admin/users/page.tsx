@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { signOut } from "next-auth/react";
 import { ALL_UI_ROLES } from "@/lib/roles";
+import { AdminNav } from "@/components/admin-nav";
 
 const ROLES = ALL_UI_ROLES;
 
@@ -72,18 +72,7 @@ export default function AdminUsersPage() {
   return (
     <div className="min-h-screen bg-blue-50 p-6">
       <div className="max-w-4xl mx-auto">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-blue-700 mb-1">MedConnect India</h1>
-            <p className="text-gray-500 text-sm mb-6">Admin — User Manager</p>
-          </div>
-          <button
-            onClick={() => signOut({ callbackUrl: "/login" })}
-            className="text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 bg-white"
-          >
-            Log out
-          </button>
-        </div>
+        <AdminNav />
 
         {message && (
           <div

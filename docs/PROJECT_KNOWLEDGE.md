@@ -321,6 +321,17 @@ review says otherwise.
   `＋ Add "<what you typed>" to the directory`, prefilling the name.
   **Still missing here: the consent checkbox** (pre-launch blocker 2).
 
+- **Done 2026-07-21 (9): admin approvals queue.** The approve action existed
+  only as a small button on a card inside `/doctors` among 206 others, while
+  the admin area contained ONLY `/admin/users` with no nav — so an admin
+  looking for approvals correctly concluded the feature didn't exist. Added
+  `/admin/doctors`: full submission shown (hospital, chamber, phone, OPD, MR
+  visiting) with consent state as a chip, Approve / Delete per row, empty
+  state. `components/admin-nav.tsx` links the admin sections + Directory and
+  carries a **pending badge** (`GET /api/admin/pending-count`). Admin `home`
+  in `lib/roles.ts` moved `/admin/users` → `/admin/doctors`, because approvals
+  are the time-sensitive job (a pending doctor is invisible to the public).
+
 ## Pre-launch checklist (raised 2026-07-21)
 
 Launch splits in two. **A one-chamber field pilot needs none of the below** —
