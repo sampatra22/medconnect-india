@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { describeAge, type StatusFreshness } from "@/lib/status-freshness";
+import { doctorShareMessage } from "@/lib/doctor-share";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The PA's page. One doctor, six huge buttons, no login, no navigation.
@@ -17,10 +18,12 @@ type LinkDoctor = {
   hospital: string;
   status: string;
   patients_left: number | null;
+  patients_source: string | null;
   status_updated_at: string | null;
   status_updated_by_name: string | null;
   freshness: StatusFreshness;
   today_hours: string | null;
+  call_number: string | null;
 };
 
 const STATUS_BUTTONS: { key: string; emoji: string; label: string; sub: string }[] = [
@@ -187,6 +190,32 @@ export default function PaUpdatePage() {
         >
           ✓ Saved — patients can see this now
         </p>
+
+        {/* The follow-through: one tap after updating, the chamber can put
+            today's status on the doctor's own WhatsApp Status — the channel
+            patients actually watch. Message obeys the same trust rules. */}
+        <a
+          href={`https://wa.me/?text=${encodeURIComponent(
+            doctorShareMessage({
+              name: doctor.name,
+              specialty: doctor.specialty,
+              status: doctor.status,
+              isLive: f.isLive,
+              confidence: f.confidence,
+              patientsLeft: doctor.patients_left,
+              patientsSource: doctor.patients_source,
+              todayHours: doctor.today_hours,
+              place: doctor.hospital,
+              number: doctor.call_number,
+              link: `${typeof window !== "undefined" ? window.location.origin : ""}/doctors?q=${encodeURIComponent(doctor.name)}`,
+            })
+          )}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 active:bg-emerald-700 py-3.5 text-sm font-bold text-white shadow-sm"
+        >
+          📤 Post today&apos;s status on WhatsApp
+        </a>
 
         <p className="text-[11px] text-gray-400 text-center mt-4">
           This private link updates {doctor.name} only. Please don&apos;t share

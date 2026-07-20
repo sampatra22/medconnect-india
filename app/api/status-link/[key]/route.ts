@@ -29,10 +29,13 @@ function view(d: {
   hospital: string;
   status: string;
   patientsLeft: number | null;
+  patientsSource: string | null;
   statusUpdatedAt: Date | null;
   statusUpdatedByRole: string | null;
   statusUpdatedByName: string | null;
   weeklyTimetable: unknown;
+  phone: string;
+  secretaryContact: string | null;
 }) {
   const tt = (d.weeklyTimetable ?? null) as Record<string, string> | null;
   return {
@@ -41,10 +44,14 @@ function view(d: {
     hospital: d.hospital,
     status: d.status,
     patients_left: d.patientsLeft,
+    patients_source: d.patientsSource,
     status_updated_at: d.statusUpdatedAt ? d.statusUpdatedAt.toISOString() : null,
     status_updated_by_name: d.statusUpdatedByName,
     freshness: statusFreshness(d.status, d.statusUpdatedAt, d.statusUpdatedByRole),
     today_hours: tt?.[istDayKey()] ?? null,
+    // For the PA's share card — the number that answers (desk first). These
+    // numbers are public on the directory already; nothing new leaks.
+    call_number: (d.secretaryContact ?? "").trim() || (d.phone ?? "").trim() || null,
   };
 }
 

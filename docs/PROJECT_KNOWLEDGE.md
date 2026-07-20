@@ -304,6 +304,14 @@ review says otherwise.
 - **Dead files pending deletion:** `data/{doctors,users,visits}.json` — zero code
   references; `git rm` blocked in the VM (no unlink). Delete locally:
   `git rm data/doctors.json data/users.json data/visits.json && git commit -m "Remove dead flat-file era data"`
+- **Done 2026-07-20 (7): per-doctor share card.** `lib/doctor-share.ts`
+  (React-free, 3 unit tests): live status speaks in present tense with queue
+  count (fresh only, "~" = MR estimate); stale falls back to "Usually today:
+  <hours>" — never fakes now. Includes chamber number + deep link
+  `/doctors?q=<name>`. Surfaced twice: small "Share this doctor" link under
+  every card's call button, and a big "Post today's status on WhatsApp"
+  button on the PA page right after the save flash — the PA's natural next
+  tap puts the status on the doctor's own WhatsApp Status.
 - **Done 2026-07-20 (6): tap-to-call.** Every directory card gets a prominent
   `tel:` button — chamber desk (`secretaryContact`) preferred over the
   doctor's own number; label is freshness-aware ("Call chamber" when live,

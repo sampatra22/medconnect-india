@@ -10,6 +10,7 @@ import {
   STATUS_LABEL,
 } from "@/components/doctor-status";
 import { statusFreshness } from "@/lib/status-freshness";
+import { doctorShareMessage } from "@/lib/doctor-share";
 
 // Role lists come from the central config in lib/roles.ts — never hard-code them.
 const CAN_STATUS = rolesWith("set_doctor_status");
@@ -168,6 +169,27 @@ function callTarget(d: Doctor): { number: string; via: string } | null {
 // "+91-98765 43210" → "tel:+919876543210"
 function telHref(raw: string): string {
   return `tel:${raw.replace(/[^+\d]/g, "")}`;
+}
+
+// One doctor → one WhatsApp message (lib/doctor-share.ts owns the format and
+// its trust rules). Used by anyone: MRs forwarding to local groups, PAs, or a
+// patient sending it to family.
+function shareHref(d: Doctor): string {
+  const f = statusFreshness(d.status, d.status_updated_at, d.status_updated_by_role);
+  const msg = doctorShareMessage({
+    name: d.name,
+    specialty: d.specialty,
+    status: d.status,
+    isLive: f.isLive,
+    confidence: f.confidence,
+    patientsLeft: d.patients_left,
+    patientsSource: d.patients_source,
+    todayHours: d.timetable?.[istDayKey()] ?? null,
+    place: d.hospital,
+    number: callTarget(d)?.number ?? null,
+    link: `${typeof window !== "undefined" ? window.location.origin : ""}/doctors?q=${encodeURIComponent(d.name)}`,
+  });
+  return `https://wa.me/?text=${encodeURIComponent(msg)}`;
 }
 
 export default function DoctorsPage() {
@@ -692,6 +714,14 @@ export default function DoctorsPage() {
                       </a>
                     );
                   })()}
+                  <a
+                    href={shareHref(d)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 text-center text-xs text-emerald-700 hover:underline"
+                  >
+                    📤 Share this doctor on WhatsApp
+                  </a>
 
                   {/* Update controls */}
                   {canEditCard(d) && (
