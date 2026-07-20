@@ -27,6 +27,7 @@ type Doctor = {
     | "token_full"
     | "opd_closed";
   patients_left: number | null;
+  patients_source: "clinic_staff" | "mr_estimate" | null;
   status_updated_at: string | null;
   status_updated_by_role: string | null;
   status_updated_by_name?: string | null;
@@ -61,6 +62,14 @@ function cityOf(d: Doctor): string {
   return parts[parts.length - 1].trim();
 }
 
+// The segment before the city: "Salt Lake, Kolkata" → "Salt Lake". This is the
+// level MR WhatsApp groups actually organise at — a beat is an area, not a
+// whole city — so it is the level the board targets its message to.
+function areaOf(d: Doctor): string {
+  const parts = d.chamber_address.split(",");
+  return parts.length >= 2 ? parts[parts.length - 2].trim() : "";
+}
+
 // NOTE: this page used to keep its own "fresh = within 24 hours" rule. That
 // quietly disagreed with the rest of the app: a status set at 6 PM Monday
 // still counted as fresh at 10 AM Tuesday and would go out on WhatsApp as
@@ -72,6 +81,7 @@ export default function StatusBoardPage() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(true);
   const [city, setCity] = useState("all");
+  const [area, setArea] = useState("all");
   const [copied, setCopied] = useState(false);
 
   async function load() {
@@ -97,15 +107,44 @@ export default function StatusBoardPage() {
     [doctors]
   );
 
+  // With one city in the data (Sam's whole territory is Kolkata), the city
+  // level disappears and the board goes straight to areas — the level a beat
+  // and its WhatsApp group actually live at.
+  const effectiveCity = city !== "all" ? city : cities.length === 1 ? cities[0] : null;
+
+  const areas = useMemo(() => {
+    if (!effectiveCity) return [];
+    return Array.from(
+      new Set(
+        doctors
+          .filter((d) => cityOf(d) === effectiveCity)
+          .map(areaOf)
+          .filter(Boolean)
+      )
+    ).sort();
+  }, [doctors, effectiveCity]);
+
   // Board order: best-for-MRs first (available → … → closed), fresh first.
   const inCity = useMemo(() => {
-    const list = doctors.filter((d) => city === "all" || cityOf(d) === city);
+    const list = doctors.filter(
+      (d) =>
+        (city === "all" || cityOf(d) === city) &&
+        (area === "all" || areaOf(d) === area)
+    );
     return [...list].sort((a, b) => {
       const r = meta(a.status).rank - meta(b.status).rank;
       if (r !== 0) return r;
       return (b.status_updated_at || "").localeCompare(a.status_updated_at || "");
     });
-  }, [doctors, city]);
+  }, [doctors, city, area]);
+
+  // What the message calls this slice: "Salt Lake, Kolkata" > "Kolkata" > all.
+  const placeLabel =
+    area !== "all" && effectiveCity
+      ? `${area}, ${effectiveCity}`
+      : city !== "all"
+        ? city
+        : null;
 
   // The message only carries statuses confirmed TODAY (IST). A WhatsApp post
   // is the one place a stale status cannot be walked back — once it is in the
@@ -127,13 +166,16 @@ export default function StatusBoardPage() {
 
   const message = useMemo(() => {
     const included = freshList.slice(0, MAX_IN_MESSAGE);
+    const leftOut = freshList.length - included.length;
     const lines = included.map((d) => {
       const m = meta(d.status);
       const f = freshnessOf(d);
       const extras = [
-        // A queue length only means something while it is still current.
+        // A queue length only means something while it is still current — and
+        // the "~" is reserved for MR estimates, same as the directory. A
+        // clinic's own count is exact and may say so.
         typeof d.patients_left === "number" && f.confidence === "fresh"
-          ? `~${d.patients_left} patients left`
+          ? `${d.patients_source === "mr_estimate" ? "~" : ""}${d.patients_left} patients left`
           : null,
         d.timetable?.[istDayKey()] ? `today ${d.timetable[istDayKey()]}` : null,
         // Say plainly whose word this is. A reader forwarding this message is
@@ -146,17 +188,19 @@ export default function StatusBoardPage() {
       return `${m.emoji} ${d.name} (${d.specialty}) — ${m.label}${extras ? " · " + extras : ""}`;
     });
     return [
-      `🩺 *Doctor Status${city !== "all" ? " — " + city : ""}*`,
+      `🩺 *Doctor Status${placeLabel ? " — " + placeLabel : ""}*`,
       `${now} IST`,
       "",
       ...(lines.length > 0
         ? lines
         : ["No doctor has confirmed their status today yet — check live:"]),
+      // The cut is announced, not silent — the overflow is the reason to tap.
+      ...(leftOut > 0 ? [`…and ${leftOut} more confirmed today on the site`] : []),
       "",
       `Live updates & timings: ${siteUrl}`,
       `— MedConnect India`,
     ].join("\n");
-  }, [freshList, city, now, siteUrl]);
+  }, [freshList, placeLabel, now, siteUrl]);
 
   async function copyText() {
     try {
@@ -196,13 +240,16 @@ export default function StatusBoardPage() {
           </button>
         </div>
 
-        {/* City filter */}
+        {/* City filter — hidden when the whole dataset is one city */}
         {cities.length > 1 ? (
-          <div className="flex flex-wrap gap-2 mb-5">
+          <div className="flex flex-wrap gap-2 mb-2">
             {["all", ...cities].map((c) => (
               <button
                 key={c}
-                onClick={() => setCity(c)}
+                onClick={() => {
+                  setCity(c);
+                  setArea("all"); // areas belong to a city; switching resets
+                }}
                 className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition ${
                   city === c
                     ? "bg-blue-600 text-white border-blue-600"
@@ -214,6 +261,28 @@ export default function StatusBoardPage() {
             ))}
           </div>
         ) : null}
+
+        {/* Area filter — the beat level. An MR posts to their area's group,
+            so the board can slice the message to exactly that audience. */}
+        {areas.length > 1 ? (
+          <div className="flex flex-wrap gap-2 mb-5">
+            {["all", ...areas].map((a) => (
+              <button
+                key={a}
+                onClick={() => setArea(a)}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition ${
+                  area === a
+                    ? "bg-emerald-600 text-white border-emerald-600"
+                    : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+                }`}
+              >
+                {a === "all" ? `All ${effectiveCity} areas` : a}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="mb-3" />
+        )}
 
         {loading ? (
           <div className="bg-white rounded-2xl shadow-sm p-10 text-center text-gray-400">
@@ -281,7 +350,7 @@ export default function StatusBoardPage() {
                           <span className="text-gray-400 font-normal"> · {d.specialty}</span>
                         </p>
                         <p className="text-xs text-gray-500 truncate">
-                          {d.hospital} · {cityOf(d)}
+                          {d.hospital} · {areaOf(d) || cityOf(d)}
                         </p>
                       </div>
                       <div className="text-right flex-none">

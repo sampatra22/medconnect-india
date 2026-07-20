@@ -304,6 +304,11 @@ review says otherwise.
 - **Dead files pending deletion:** `data/{doctors,users,visits}.json` — zero code
   references; `git rm` blocked in the VM (no unlink). Delete locally:
   `git rm data/doctors.json data/users.json data/visits.json && git commit -m "Remove dead flat-file era data"`
+- **Done 2026-07-20 (3):** Status Board targets the beat, not the city — area
+  chips (second-to-last address segment, e.g. "Salt Lake"), message header
+  "Doctor Status — Salt Lake, Kolkata", "…and N more confirmed today" when the
+  15-line cap cuts, and "~" on patient counts only for MR estimates (clinic
+  counts are exact), matching the directory.
 - **Done 2026-07-20 (2):** directory search/filter/paging moved server-side —
   `GET /api/doctors` takes `q/city/specialty/status/page/per` (default 24,
   cap 500), returns `{ doctors, total, page, per, has_more }` + `cities`/
