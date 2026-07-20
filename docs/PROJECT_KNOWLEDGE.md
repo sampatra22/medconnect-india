@@ -321,6 +321,18 @@ review says otherwise.
   `＋ Add "<what you typed>" to the directory`, prefilling the name.
   **Still missing here: the consent checkbox** (pre-launch blocker 2).
 
+- **Fixed 2026-07-21 (10): "OPD Closed · 3 patients left".** A queue survived
+  a status change to a non-sitting status — nothing ever cleared
+  `patientsLeft`. Contradictions like this cost trust on the one surface whose
+  whole value is trust. `statusHasQueue()` now lives in
+  `lib/status-freshness.ts` (tested): only available/busy/token_full may carry
+  a count; unknown statuses default to no-queue. **Both** write paths
+  (`/api/doctors/[id]/status` and the PA link) clear `patientsLeft` +
+  `patientsSource` at the source when the status can't have one, so no screen
+  and no WhatsApp message has to remember to hide it. Also fixed the MR
+  dashboard detail modal, which showed the count with no freshness guard at
+  all. 3 contradictory rows in production were cleared.
+
 - **Done 2026-07-21 (9): admin approvals queue.** The approve action existed
   only as a small button on a card inside `/doctors` among 206 others, while
   the admin area contained ONLY `/admin/users` with no nav — so an admin

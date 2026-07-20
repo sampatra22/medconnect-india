@@ -4,6 +4,7 @@ import {
   statusFreshness,
   describeAge,
   timetableFallback,
+  statusHasQueue,
   FRESH_MINUTES,
 } from "@/lib/status-freshness";
 
@@ -134,4 +135,19 @@ test("age is phrased identically everywhere", () => {
   assert.equal(describeAge(60), "1 hr ago");
   assert.equal(describeAge(60 * 26), "1 day ago");
   assert.equal(describeAge(60 * 24 * 3), "3 days ago");
+});
+
+test("only a sitting doctor can have a queue", () => {
+  // The bug this pins: "OPD Closed · 3 patients left" reached a real card.
+  // A queue cannot outlive the sitting, so these statuses clear the count.
+  for (const s of ["available", "busy", "token_full"]) {
+    assert.equal(statusHasQueue(s), true, `${s} should allow a queue`);
+  }
+  for (const s of ["opd_closed", "holiday", "no_mr_today"]) {
+    assert.equal(statusHasQueue(s), false, `${s} must not carry a queue`);
+  }
+  // Unknown/absent status is treated as "no queue" — the safe direction.
+  assert.equal(statusHasQueue(null), false);
+  assert.equal(statusHasQueue(undefined), false);
+  assert.equal(statusHasQueue("something_new"), false);
 });

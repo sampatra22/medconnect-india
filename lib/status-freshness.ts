@@ -143,6 +143,19 @@ export function statusFreshness(
 }
 
 /**
+ * Statuses where a queue can exist, because the doctor is actually sitting.
+ * "OPD Closed" with "3 patients left" is a contradiction a reader has to
+ * resolve, and every contradiction costs trust — so the count is CLEARED at
+ * the source when the status can't have one, rather than hidden per screen.
+ */
+const QUEUE_STATUSES: ReadonlySet<string> = new Set(["available", "busy", "token_full"]);
+
+/** Can this status have a patients-waiting count at all? */
+export function statusHasQueue(status: string | null | undefined): boolean {
+  return QUEUE_STATUSES.has(status ?? "");
+}
+
+/**
  * The isLive rule expressed as a database bound: a status is live exactly when
  * `statusUpdatedAt >= liveSince(now)` — i.e. confirmed within today's IST day.
  * This exists so a WHERE clause (e.g. the directory's "available now" filter)

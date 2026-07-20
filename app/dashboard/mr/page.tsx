@@ -1187,7 +1187,7 @@ export default function MrDashboard() {
                 <div className="text-sm font-semibold text-blue-600">{detail.specialty}{detail.qualification ? ` · ${detail.qualification}` : ""}</div>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <StatusBadge d={detail} />
-                  {typeof detail.patients_left === "number" ? <span className="text-xs text-slate-500">👥 {detail.patients_left} left</span> : null}
+                  {typeof detail.patients_left === "number" && freshnessOf(detail).confidence === "fresh" ? <span className="text-xs text-slate-500">👥 {detail.patients_left} left</span> : null}
                 </div>
                 {freshness(detail) ? <div className="mt-1 text-[11px] text-slate-400">Status updated {freshness(detail)}{detail.status_updated_by_name ? ` (${detail.status_updated_by_name})` : ""}</div> : null}
               </div>

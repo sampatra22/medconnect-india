@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { guarded } from "@/lib/api";
 import { rateLimit } from "@/lib/rate-limit";
-import { statusFreshness } from "@/lib/status-freshness";
+import { statusFreshness, statusHasQueue } from "@/lib/status-freshness";
 import { istDayKey } from "@/lib/ist";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -124,6 +124,15 @@ export const PUT = guarded(async (
       // The chamber's own count — the trusted source, no "~".
       data.patientsSource = "clinic_staff";
     }
+  }
+
+  // Same rule as the signed-in route: a queue cannot outlive the sitting.
+  // The PA taps "OPD Closed" and the leftover count disappears with it.
+  const nextStatus = (data.status as string | undefined) ?? doctor.status;
+  if (!statusHasQueue(nextStatus) && doctor.patientsLeft !== null) {
+    changes.patients_left = { from: doctor.patientsLeft, to: null };
+    data.patientsLeft = null;
+    data.patientsSource = null;
   }
 
   if (Object.keys(changes).length === 0) {

@@ -5,6 +5,7 @@ import { serializeDoctor } from "@/lib/serialize";
 import { rolesWith } from "@/lib/roles";
 import { guarded } from "@/lib/api";
 import { rateLimit } from "@/lib/rate-limit";
+import { statusHasQueue } from "@/lib/status-freshness";
 
 const STATUSES = ["available", "busy", "holiday", "no_mr_today", "token_full", "opd_closed"];
 // Role lists come from the central config in lib/roles.ts — never hard-code them.
@@ -74,6 +75,17 @@ export const PUT = guarded(async (
       data.patientsLeft = n;
       data.patientsSource = user.role === "mr" ? "mr_estimate" : "clinic_staff";
     }
+  }
+
+  // A queue cannot outlive the sitting. When the status becomes one that
+  // can't have patients waiting (OPD closed, holiday, no MR today), the count
+  // is cleared here — at the source — so no screen has to remember to hide it
+  // and no WhatsApp message can carry "OPD Closed · 3 patients left".
+  const nextStatus = (data.status as string | undefined) ?? doctor.status;
+  if (!statusHasQueue(nextStatus) && doctor.patientsLeft !== null) {
+    changes.patients_left = { from: doctor.patientsLeft, to: null };
+    data.patientsLeft = null;
+    data.patientsSource = null;
   }
 
   if (Object.keys(changes).length === 0) {
