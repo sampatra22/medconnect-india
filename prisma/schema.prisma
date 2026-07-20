@@ -1,6 +1,9 @@
 generator client {
-  provider      = "prisma-client-js"
-  binaryTargets = ["native", "windows", "debian-openssl-3.0.x"]
+  provider = "prisma-client-js"
+  // native/windows: Sam's machine · debian: the Claude bridge VM ·
+  // rhel: Vercel's serverless runtime (Amazon Linux) — without it the deployed
+  // app throws "could not locate Query Engine" at first query.
+  binaryTargets = ["native", "windows", "debian-openssl-3.0.x", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
