@@ -36,8 +36,11 @@ export default async function Image() {
           }}
         >
           <span>Is the doctor</span>
-          <span>
-            available <span style={{ color: "#059669" }}>right now?</span>
+          {/* Satori collapses whitespace between elements — the gap has to be
+              a flex gap, not a space character, or the words run together. */}
+          <span style={{ display: "flex", gap: 18 }}>
+            <span>available</span>
+            <span style={{ color: "#059669" }}>right now?</span>
           </span>
         </div>
         <div style={{ display: "flex", marginTop: 28, fontSize: 30, color: "#475569", maxWidth: 900 }}>

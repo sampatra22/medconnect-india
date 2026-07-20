@@ -4,7 +4,8 @@ import { SiteFooter } from "@/components/site-footer";
 import { CONTACT_EMAIL } from "@/lib/contact";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy · MedConnect India",
+  // Root layout appends "· MedConnect India" via its title template.
+  title: "Privacy Policy",
   description:
     "What MedConnect India collects, what is public, and how a doctor can correct or remove their listing.",
 };

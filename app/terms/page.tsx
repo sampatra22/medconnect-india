@@ -4,7 +4,8 @@ import { SiteFooter } from "@/components/site-footer";
 import { CONTACT_EMAIL } from "@/lib/contact";
 
 export const metadata: Metadata = {
-  title: "Terms of Use · MedConnect India",
+  // Root layout appends "· MedConnect India" via its title template.
+  title: "Terms of Use",
   description:
     "Terms of use for MedConnect India, including the medical disclaimer and rules for updating doctor availability.",
 };
