@@ -84,14 +84,22 @@ export function serializeDoctor(
     // Shipping this alongside the raw fields means a client can never render a
     // stale status as live by forgetting to apply the rule itself.
     freshness: statusFreshness(d.status, d.statusUpdatedAt, d.statusUpdatedByRole),
-    updateHistory: (d.updates ?? []).map((u) => ({
-      timestamp: u.createdAt.toISOString(),
-      user_id: u.userId,
-      user_name: u.userName,
-      user_email: u.userEmail,
-      role: u.role,
-      changes: u.changes as Record<string, { from: unknown; to: unknown }>,
-    })),
+    // Present only when the caller explicitly loaded `updates` — single-doctor
+    // reads and post-edit responses. The public directory list omits it: 20
+    // audit rows per doctor is dead weight at scale, and history carries
+    // editor emails, which must never ride along in an anonymous payload.
+    ...(d.updates
+      ? {
+          updateHistory: d.updates.map((u) => ({
+            timestamp: u.createdAt.toISOString(),
+            user_id: u.userId,
+            user_name: u.userName,
+            user_email: u.userEmail,
+            role: u.role,
+            changes: u.changes as Record<string, { from: unknown; to: unknown }>,
+          })),
+        }
+      : {}),
   };
 }
 

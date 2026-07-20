@@ -165,6 +165,11 @@ export default function DoctorsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [updatingId, setUpdatingId] = useState<Doctor["id"] | null>(null);
   const [historyOpenId, setHistoryOpenId] = useState<Doctor["id"] | null>(null);
+  // Lazy-loaded audit history. The list payload no longer carries history for
+  // all 206 doctors — one card's history is fetched the first time its panel
+  // opens, then kept for the session.
+  const [historyById, setHistoryById] = useState<Record<string, HistoryEntry[]>>({});
+  const [historyLoadingId, setHistoryLoadingId] = useState<Doctor["id"] | null>(null);
   const [ttOpenId, setTtOpenId] = useState<Doctor["id"] | null>(null);
 
   const { data: session } = useSession();
@@ -217,6 +222,25 @@ export default function DoctorsPage() {
       alert(error || "Update failed. Try again.");
     }
     setUpdatingId(null);
+  }
+
+  // Open/close one card's audit panel; fetch its history on first open.
+  // A doctor object freshly returned by a status/verify edit already carries
+  // updateHistory — in that case there is nothing to fetch.
+  async function toggleHistory(d: Doctor) {
+    if (historyOpenId === d.id) {
+      setHistoryOpenId(null);
+      return;
+    }
+    setHistoryOpenId(d.id);
+    if (d.updateHistory || historyById[d.id]) return; // already known
+    setHistoryLoadingId(d.id);
+    const res = await fetch(`/api/doctors/${d.id}`);
+    if (res.ok) {
+      const { doctor } = (await res.json()) as { doctor?: Doctor };
+      setHistoryById((prev) => ({ ...prev, [d.id]: doctor?.updateHistory ?? [] }));
+    }
+    setHistoryLoadingId(null);
   }
 
   // Module 6: admin approves an MR-added profile -> visible to everyone.
@@ -350,6 +374,9 @@ export default function DoctorsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {ranked.map((d) => {
               const todayHours = d.timetable?.[istDayKey()] ?? null;
+              // History if we have it: a post-edit response carries the newest
+              // copy on the doctor itself; otherwise the lazy-loaded cache.
+              const knownHistory = d.updateHistory ?? historyById[d.id];
               return (
                 <div key={d.id} className="bg-white rounded-2xl shadow-sm p-5 flex flex-col">
                   <div className="flex items-start justify-between gap-2">
@@ -422,15 +449,13 @@ export default function DoctorsPage() {
                     )}
                     {user && (
                       <button
-                        onClick={() =>
-                          setHistoryOpenId(historyOpenId === d.id ? null : d.id)
-                        }
+                        onClick={() => void toggleHistory(d)}
                         className="text-xs text-blue-600 hover:underline mt-0.5"
                       >
                         {historyOpenId === d.id
                           ? "Hide edit history"
                           : `View edit history${
-                              d.updateHistory?.length ? ` (${d.updateHistory.length})` : ""
+                              knownHistory?.length ? ` (${knownHistory.length})` : ""
                             }`}
                       </button>
                     )}
@@ -439,11 +464,13 @@ export default function DoctorsPage() {
                   {/* Audit trail: who changed what, so no edit is anonymous */}
                   {user && historyOpenId === d.id && (
                     <div className="mt-2 mb-1 bg-gray-50 rounded-lg p-3 max-h-40 overflow-y-auto">
-                      {!d.updateHistory || d.updateHistory.length === 0 ? (
+                      {historyLoadingId === d.id && !knownHistory ? (
+                        <p className="text-xs text-gray-400">Loading history…</p>
+                      ) : !knownHistory || knownHistory.length === 0 ? (
                         <p className="text-xs text-gray-400">No edits recorded yet.</p>
                       ) : (
                         <ul className="space-y-2">
-                          {d.updateHistory.map((entry, idx) => (
+                          {knownHistory.map((entry, idx) => (
                             <li key={idx} className="text-xs border-b border-gray-200 last:border-0 pb-2 last:pb-0">
                               <p>
                                 <EditorProfile

@@ -31,10 +31,13 @@ export const GET = guarded(async () => {
       : u?.id
         ? { OR: [{ verified: true }, { addedById: u.id }] }
         : { verified: true };
+  // NO `updates` here. History is 20 audit rows × every doctor (~4,000 rows
+  // at 206 doctors) to power a panel most visitors never open — and it carries
+  // editor emails, which have no business in a public payload. The directory
+  // lazy-loads one doctor's history from GET /api/doctors/[id] on demand.
   const doctors = await prisma.doctor.findMany({
     where,
     include: {
-      updates: { orderBy: { createdAt: "desc" }, take: 20 },
       dayPlans: { where: { date: istToday(), shared: true }, take: 1 },
     },
     orderBy: { createdAt: "asc" },
