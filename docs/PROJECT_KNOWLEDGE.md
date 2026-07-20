@@ -304,6 +304,16 @@ review says otherwise.
 - **Dead files pending deletion:** `data/{doctors,users,visits}.json` — zero code
   references; `git rm` blocked in the VM (no unlink). Delete locally:
   `git rm data/doctors.json data/users.json data/visits.json && git commit -m "Remove dead flat-file era data"`
+- **DEPLOYED 2026-07-20: https://medconnect-india.vercel.app is LIVE.**
+  Vercel project `medconnect-india` (team sampatra22s-projects), git-connected,
+  auto-deploys `main`. Env vars in Vercel: `DATABASE_URL`, `AUTH_SECRET`
+  (Production+Preview, sensitive). Verified live: /api/doctors returns all 206
+  doctors with freshness verdicts; /doctors renders trust badges; /status-board
+  area chips + URL params work. **History:** the project had existed since
+  Jul 2 but EVERY build after the skeleton failed silently — fixed by the
+  "Vercel prep" commit (`prisma generate` in build + `rhel-openssl-3.0.x`
+  binary target). Env vars were the second blocker (paste `KEY=value` into the
+  Key box — it auto-splits; the value alone in Key fails validation).
 - **Done 2026-07-20 (4):** board is bookmarkable per beat —
   `/status-board?city=…&area=…` read on mount, chips mirror into the URL
   (replaceState), "🔗 Copy board link" button. Pin one link per WhatsApp group.
