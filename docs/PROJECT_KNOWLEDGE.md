@@ -321,6 +321,21 @@ review says otherwise.
   `＋ Add "<what you typed>" to the directory`, prefilling the name.
   **Still missing here: the consent checkbox** (pre-launch blocker 2).
 
+- **Done 2026-07-22 (16): bulk doctor import (parking-lot spec, plain code, no
+  AI).** MR dashboard → "📄 Import list": company-portal CSV/XLS/XLSX parsed
+  IN THE BROWSER (SheetJS `xlsx`, dynamic import so the bundle stays lean —
+  the file never reaches our server). Header auto-detection against real
+  portal spellings ("Doctor Name", "Speciality", "Mobile No", "Hospital/
+  Clinic"; City column folds into the address); rows pre-classified
+  New / Already listed / No name with a review table BEFORE anything is
+  created. `POST /api/doctors/bulk` (max 100/batch, client loops; 5 batches/hr)
+  revalidates every row with single-create clamps, one batched duplicate-guard
+  read, audit row per doctor. **Consent stance: bulk rows import with
+  consentGiven NULL and verified false, always** — a portal export is not a
+  doctor's agreement; they land in the approvals queue showing "⚠ No consent
+  recorded" and the MR collects consent on normal visits. Parse+detection
+  verified against a synthetic portal-style workbook.
+
 - **Done 2026-07-21 (15): patient detail panel (parking-lot spec delivered).**
   Tap anywhere on a directory card (real controls excluded via closest())
   → in-place bottom-sheet (mobile) / modal (desktop), no page load. Contents

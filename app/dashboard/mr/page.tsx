@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { SosButton } from "@/components/sos-button";
 import { statusFreshness, describeAge } from "@/lib/status-freshness";
 import { ComboBox } from "@/components/combo-box";
+import { DoctorBulkImport } from "@/components/doctor-bulk-import";
 import { rankSuggestions, SPECIALTIES, QUALIFICATIONS } from "@/lib/medical-vocab";
 
 type Doctor = {
@@ -278,6 +279,7 @@ export default function MrDashboard() {
   const geoCache = useRef(new Map<string, { lat: number; lon: number }>());
   // Set when the form is correcting an existing profile rather than creating.
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showImport, setShowImport] = useState(false);
   const [calMonth, setCalMonth] = useState(new Date());
   const [selDate, setSelDate] = useState(istToday());
   // Module 5 · Call MR — incoming call requests (doctor name + when + note)
@@ -1047,6 +1049,7 @@ export default function MrDashboard() {
                 <option value="done">Visited today</option>
               </select>
               <button onClick={() => void openAddDoctor()} className="h-11 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm">＋ New doctor (not in list)</button>
+              <button onClick={() => setShowImport(true)} className="h-11 rounded-xl border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-50">📄 Import list</button>
             </div>
             <div className="mb-3 text-xs text-slate-500">Showing {filtered.length} of {doctors.length} doctors</div>
 
@@ -1335,6 +1338,15 @@ export default function MrDashboard() {
             </div>
           </div>
         </div>
+      ) : null}
+
+      {/* Bulk import: the company-portal Excel, without the retyping */}
+      {showImport ? (
+        <DoctorBulkImport
+          existing={doctors.map((d) => ({ name: d.name, hospital: d.hospital }))}
+          onDone={loadDoctors}
+          onClose={() => setShowImport(false)}
+        />
       ) : null}
 
       {/* Add a new doctor to the directory */}
