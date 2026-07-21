@@ -321,6 +321,22 @@ review says otherwise.
   `＋ Add "<what you typed>" to the directory`, prefilling the name.
   **Still missing here: the consent checkbox** (pre-launch blocker 2).
 
+- **Done 2026-07-22 (20): E2E test campaign — 45/45 green against production.**
+  `scripts/e2e-smoke.mjs <base-url>` plays six personas with real HTTP +
+  cookie jars: anonymous patient, two fresh MR signups, the doctor account,
+  admin, and an account-less PA. Covers: public surface (paging, name search,
+  available-now filter, **MR anonymity verified live**), guest attack
+  boundaries (401/403s), signup/dup/login/wrong-pw, MR add/edit + ownership
+  (MR2 blocked from MR1's doctor), consent-refusal on create, status trust
+  (mr_estimate, queue-clear on OPD close, junk rejected, doctor own-card
+  only), full PA-link lifecycle (issue→use→rotate kills old→revoke kills
+  all→garbage 404), bulk import row classification, admin consent gate
+  (409 needs_consent → vouch approves + records), verify/re-verify,
+  pending-count, password change end-to-end. Creates only ZZTEST data and
+  deletes all of it (verified 200s). Stays inside every rate limit. Run after
+  each deploy. NOT covered: visual rendering, real-phone behaviour, WhatsApp
+  link previews — those stay manual.
+
 - **Done 2026-07-22 (19): doctor photos + MR public anonymity.**
   `Doctor.photo` (migration `20260722100000_doctor_photo`, **apply before
   deploy**): client-side canvas cover-crop to 96px JPEG (~few KB) in the MR
