@@ -716,9 +716,13 @@ export default function MrDashboard() {
     if (spec && d.specialty !== spec) return false;
     if (planFilter === "todo" && visitedToday(d.id)) return false;
     if (planFilter === "done" && !visitedToday(d.id)) return false;
-    if (!search) return true;
-    const t = search.toLowerCase();
-    return `${d.name} ${d.specialty || ""} ${d.hospital || ""} ${d.chamber_address || ""}`.toLowerCase().includes(t);
+    if (!search.trim()) return true;
+    // Same rule as the public directory: search means the NAME. Matching
+    // specialty/hospital/address in the same box made results feel random —
+    // "kar" lit up half of Kolkata through street names. Specialty has its
+    // own dropdown; that's what structured filters are for.
+    const t = search.trim().toLowerCase();
+    return d.name.toLowerCase().includes(t);
   });
 
   const pickerDoctors = doctors.filter((d) => {
@@ -1037,7 +1041,7 @@ export default function MrDashboard() {
         ) : tab === "doctors" ? (
           <section className="mt-4">
             <div className="mb-3 flex flex-wrap items-center gap-2">
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search doctor, specialty, hospital…"
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search doctor by name…"
                 className="h-11 min-w-[200px] flex-1 rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none focus:border-blue-500" />
               <select value={spec} onChange={(e) => setSpec(e.target.value)} className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm">
                 <option value="">All specialties</option>

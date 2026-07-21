@@ -321,6 +321,14 @@ review says otherwise.
   `＋ Add "<what you typed>" to the directory`, prefilling the name.
   **Still missing here: the consent checkbox** (pre-launch blocker 2).
 
+- **Fixed 2026-07-22 (18): MR Doctors-tab search = name only.** The search box
+  matched name+specialty+hospital+ADDRESS in one string, so results felt
+  random ("kar" matched street names across half the directory). Now the same
+  rule as the public directory: search means the name; specialty/plan status
+  are the dropdowns. Placeholder matches ("Search doctor by name…"). The two
+  picker modals (Add to Plan / My Doctors) keep multi-field matching — there
+  it's useful ("pick all my Ortho doctors") and the placeholder says so.
+
 - **Fixed 2026-07-22 (17): bulk import vs the real world.** Sam's actual
   portal export failed: it is an **ASP.NET GridView HTML page saved as .xls**
   (extremely common for Indian pharma portals), with report-title rows above
