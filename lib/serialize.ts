@@ -63,6 +63,10 @@ export function serializeDoctor(
       ? d.languages.split(",").map((s) => s.trim()).filter(Boolean)
       : [],
     status: d.status,
+    // Chamber coordinates — public by nature (the address is already public);
+    // powers the patient's Directions button.
+    latitude: d.latitude ?? null,
+    longitude: d.longitude ?? null,
     // Module 4: doctor-owned availability layers
     user_id: d.userId ?? null, // account that owns this profile (claim flow)
     // Module 6: who contributed this profile + admin verification state

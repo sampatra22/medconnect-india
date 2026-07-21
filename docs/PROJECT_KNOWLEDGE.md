@@ -321,6 +321,18 @@ review says otherwise.
   `＋ Add "<what you typed>" to the directory`, prefilling the name.
   **Still missing here: the consent checkbox** (pre-launch blocker 2).
 
+- **Done 2026-07-21 (15): patient detail panel (parking-lot spec delivered).**
+  Tap anywhere on a directory card (real controls excluded via closest())
+  → in-place bottom-sheet (mobile) / modal (desktop), no page load. Contents
+  in patient question order: badge + attribution + fresh-only queue count;
+  "Today: <hours>" via the fallback ladder; hospital + address; big **📞 Call**
+  (desk-first) beside **🧭 Directions** — Google Maps `dir/?api=1` with the
+  device's own location as origin (we never request geolocation permission);
+  destination = saved GPS pin when present, else geocoded address text, so it
+  works for all 206 today and sharpens as coords fill in. Share link + full
+  weekly timetable + "call before travelling" caveat. `serializeDoctor` now
+  ships `latitude/longitude` (public — the address already is).
+
 - **Done 2026-07-21 (14): patient-first directory card + mobile filters.**
   Sam's directive: "if a patient gets benefited then this is more valuable for
   all." Card reading order is now the patient's question order: name → status

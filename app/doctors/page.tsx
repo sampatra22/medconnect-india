@@ -55,6 +55,8 @@ type Doctor = {
   today_plan?: TodayPlan | null;
   languages: string[];
   status: "available" | "busy" | "holiday" | "no_mr_today" | "token_full" | "opd_closed";
+  latitude?: number | null;
+  longitude?: number | null;
   patients_left: number | null;
   patients_source: "clinic_staff" | "mr_estimate" | null;
   status_updated_at: string | null;
@@ -176,6 +178,20 @@ function telHref(raw: string): string {
   return `tel:${raw.replace(/[^+\d]/g, "")}`;
 }
 
+// Directions from wherever the patient is standing. Google Maps uses the
+// device's current location as the origin automatically — we never ask for
+// location permission ourselves. Saved GPS coordinates (captured when an MR
+// picks a map-searched address) give a pin-exact destination; for the rest,
+// Google geocodes the address text — so the button works for every doctor
+// today and simply gets sharper as coordinates fill in.
+function directionsHref(d: Doctor): string {
+  const dest =
+    d.latitude != null && d.longitude != null
+      ? `${d.latitude},${d.longitude}`
+      : [d.hospital, d.chamber_address].filter(Boolean).join(", ");
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}`;
+}
+
 // One doctor → one WhatsApp message (lib/doctor-share.ts owns the format and
 // its trust rules). Used by anyone: MRs forwarding to local groups, PAs, or a
 // patient sending it to family.
@@ -220,6 +236,9 @@ export default function DoctorsPage() {
   const [specialties, setSpecialties] = useState<string[]>([]);
   const [updatingId, setUpdatingId] = useState<Doctor["id"] | null>(null);
   const [historyOpenId, setHistoryOpenId] = useState<Doctor["id"] | null>(null);
+  // The patient detail panel — opened by tapping a card, closed by tapping
+  // outside. In-place, no page load (parking-lot spec, delivered).
+  const [detailDoc, setDetailDoc] = useState<Doctor | null>(null);
   // Lazy-loaded audit history. The list payload no longer carries history for
   // all 206 doctors — one card's history is fetched the first time its panel
   // opens, then kept for the session.
@@ -521,7 +540,22 @@ export default function DoctorsPage() {
                 d.status_updated_by_role
               ).isLive;
               return (
-                <div key={d.id} className="bg-white rounded-2xl shadow-sm p-4 sm:p-5 flex flex-col">
+                <div
+                  key={d.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => {
+                    // The whole card opens the detail panel — EXCEPT taps on
+                    // real controls (call, share, status buttons, history…),
+                    // which must keep doing their own job.
+                    if ((e.target as HTMLElement).closest("button, a, input, select, textarea, label")) return;
+                    setDetailDoc(d);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && e.target === e.currentTarget) setDetailDoc(d);
+                  }}
+                  className="bg-white rounded-2xl shadow-sm p-4 sm:p-5 flex flex-col cursor-pointer hover:shadow-md transition-shadow"
+                >
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <h2 className="font-bold text-gray-800 flex items-center gap-1.5">
@@ -850,6 +884,119 @@ export default function DoctorsPage() {
             })}
           </div>
         )}
+
+        {/* ── Patient detail panel ──────────────────────────────────────────
+            Everything a patient needs to act, one tap deep: is the doctor in
+            (and on whose word), when do they sit, one tap to call the number
+            that answers, one tap to navigate there from wherever they are. */}
+        {detailDoc && (() => {
+          const d = detailDoc;
+          const dToday = timetableFallback(d.timetable, istDayKey(), d.consultation_timing);
+          const t = callTarget(d);
+          const f = statusFreshness(d.status, d.status_updated_at, d.status_updated_by_role);
+          return (
+            <div
+              className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50 p-0 sm:p-4"
+              onClick={(e) => { if (e.target === e.currentTarget) setDetailDoc(null); }}
+            >
+              <div className="w-full sm:max-w-md max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl bg-white p-5 shadow-xl">
+                <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-gray-200 sm:hidden" />
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="text-lg font-bold text-gray-800 leading-tight">{d.name}</h2>
+                    <p className="text-sm font-medium text-blue-700">{d.specialty}</p>
+                    <p className="text-xs text-gray-500">{d.qualification}</p>
+                  </div>
+                  <button
+                    onClick={() => setDetailDoc(null)}
+                    aria-label="Close"
+                    className="flex-none rounded-full bg-gray-100 px-2.5 py-1 text-sm text-gray-500 hover:bg-gray-200"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="mt-3">
+                  <DoctorStatusBadge doctor={d} />
+                  <div className="mt-1">
+                    <StatusAttribution doctor={d} className="block" />
+                  </div>
+                  {typeof d.patients_left === "number" && f.confidence === "fresh" ? (
+                    <p className="mt-1 text-sm font-medium text-gray-700">
+                      {d.patients_source === "mr_estimate"
+                        ? `~${d.patients_left} patients waiting (MR estimate)`
+                        : `${d.patients_left} patients waiting`}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="mt-4 space-y-1.5 border-t border-gray-100 pt-4 text-sm text-gray-600">
+                  {dToday ? (
+                    <p className="font-medium text-emerald-700">🕐 Today: {dToday}</p>
+                  ) : null}
+                  <p>🏥 {d.hospital}</p>
+                  <p>📍 {d.chamber_address}</p>
+                </div>
+
+                {/* The two actions that end the visit-planning problem. */}
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  {t ? (
+                    <a
+                      href={telHref(t.number)}
+                      className="rounded-xl bg-emerald-600 py-3 text-center text-sm font-bold text-white active:bg-emerald-700"
+                    >
+                      📞 Call
+                      <span className="block text-[10px] font-normal text-emerald-100">
+                        {t.via}
+                      </span>
+                    </a>
+                  ) : null}
+                  <a
+                    href={directionsHref(d)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`rounded-xl bg-blue-600 py-3 text-center text-sm font-bold text-white active:bg-blue-700 ${t ? "" : "col-span-2"}`}
+                  >
+                    🧭 Directions
+                    <span className="block text-[10px] font-normal text-blue-100">
+                      from your location
+                    </span>
+                  </a>
+                </div>
+                <a
+                  href={shareHref(d)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 block text-center text-xs font-semibold text-emerald-700 hover:underline"
+                >
+                  📤 Share this doctor on WhatsApp
+                </a>
+
+                {/* Weekly pattern — the full answer to "when do they sit?" */}
+                {d.timetable && Object.keys(d.timetable).length > 0 ? (
+                  <div className="mt-4 rounded-xl bg-blue-50 p-3 space-y-0.5">
+                    {DAY_ORDER.map((k) => (
+                      <div
+                        key={k}
+                        className={`text-xs flex gap-2 ${
+                          k === istDayKey() ? "font-bold text-blue-800" : "text-gray-600"
+                        }`}
+                      >
+                        <span className="w-9 flex-none">{DAY_SHORT[k]}</span>
+                        <span className="min-w-0">{d.timetable?.[k] || "—"}</span>
+                        {k === istDayKey() && <span className="text-blue-500 flex-none">← today</span>}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                <p className="mt-4 text-[10px] text-gray-400 text-center">
+                  Availability can change — call before travelling.
+                </p>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Paging: fetch the next slice only when someone asks for it. */}
         {!loading && doctors.length > 0 && (
