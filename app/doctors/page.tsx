@@ -441,19 +441,21 @@ export default function DoctorsPage() {
           </button>
         </div>
 
-        {/* Filters */}
-        <div className="bg-white rounded-2xl shadow-sm p-4 mb-6 grid grid-cols-1 sm:grid-cols-4 gap-3">
+        {/* Filters — on a phone the search box gets the full row (it is the
+            main tool), and the three dropdowns share one compact row below
+            instead of stacking into a screen-tall wall before any doctor. */}
+        <div className="bg-white rounded-2xl shadow-sm p-3 sm:p-4 mb-6 grid grid-cols-3 sm:grid-cols-4 gap-2 sm:gap-3">
           <input
             type="text"
             placeholder="Search doctor by name…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="col-span-3 sm:col-span-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
           <select
             value={city}
             onChange={(e) => setCity(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+            className="w-full min-w-0 border border-gray-200 rounded-lg px-2 sm:px-3 py-2 text-xs sm:text-sm bg-white"
           >
             <option value="all">All Cities</option>
             {cities.map((c) => (
@@ -463,7 +465,7 @@ export default function DoctorsPage() {
           <select
             value={specialty}
             onChange={(e) => setSpecialty(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+            className="w-full min-w-0 border border-gray-200 rounded-lg px-2 sm:px-3 py-2 text-xs sm:text-sm bg-white"
           >
             <option value="all">All Specialties</option>
             {specialties.map((s) => (
@@ -473,7 +475,7 @@ export default function DoctorsPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+            className="w-full min-w-0 border border-gray-200 rounded-lg px-2 sm:px-3 py-2 text-xs sm:text-sm bg-white"
           >
             <option value="all">All Statuses</option>
             {STATUS_KEYS.map((s) => (
@@ -504,11 +506,22 @@ export default function DoctorsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {ranked.map((d) => {
               const todayHours = d.timetable?.[istDayKey()] ?? null;
+              // With the OPD-hours fallback, "today's hours" and the OPD line
+              // are often the same string — printing both reads like a
+              // copy-paste mistake. Show OPD separately only when it differs.
+              const opdDiffers =
+                !!d.consultation_timing &&
+                d.consultation_timing.trim() !== (todayHours ?? "").trim();
               // History if we have it: a post-edit response carries the newest
               // copy on the doctor itself; otherwise the lazy-loaded cache.
               const knownHistory = d.updateHistory ?? historyById[d.id];
+              const live = statusFreshness(
+                d.status,
+                d.status_updated_at,
+                d.status_updated_by_role
+              ).isLive;
               return (
-                <div key={d.id} className="bg-white rounded-2xl shadow-sm p-5 flex flex-col">
+                <div key={d.id} className="bg-white rounded-2xl shadow-sm p-4 sm:p-5 flex flex-col">
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <h2 className="font-bold text-gray-800 flex items-center gap-1.5">
@@ -537,8 +550,10 @@ export default function DoctorsPage() {
                         </p>
                       ) : null}
                     </div>
+                    {/* The right column keeps only small chips — the status
+                        badge lives below the name at full width, so long
+                        doctor names and long hours never fight for space. */}
                     <div className="flex flex-col items-end gap-1">
-                      <DoctorStatusBadge doctor={d} />
                       {user?.role === "admin" && d.verified === false && (
                         <button
                           onClick={() => verifyDoctor(d)}
@@ -557,7 +572,13 @@ export default function DoctorsPage() {
                   </div>
 
                   {/* Patients left + freshness */}
-                  <div className="mt-2 min-h-[20px]">
+                  {/* Patient reading order: who ↑, are they in NOW ↓, then
+                      when they sit and how to reach them. The badge gets its
+                      own full-width row — the patient's actual question. */}
+                  <div className="mt-2">
+                    <DoctorStatusBadge doctor={d} />
+                  </div>
+                  <div className="mt-1.5 min-h-[20px]">
                     {/* A queue length is the most perishable fact on the card —
                         it is only shown while the status behind it is still
                         fresh. Yesterday's "3 patients left" is noise. */}
@@ -642,13 +663,18 @@ export default function DoctorsPage() {
                   <div className="mt-3 text-sm text-gray-600 space-y-1 flex-1">
                     <p>🏥 {d.hospital}</p>
                     <p>📍 {d.chamber_address}</p>
-                    <p>🩺 OPD: {d.consultation_timing}</p>
-                    {/* Module 4: today's hours straight from the doctor's own
-                        timetable — no expanding needed to answer "when do I go?" */}
-                    {todayHours ? (
+                    {/* One line answers "when do I go?" — never three. The
+                        badge already says "Usually …" when nothing is
+                        confirmed today, so the timetable line appears only
+                        while the status is live, and the general OPD line only
+                        when it adds something the other lines don't. */}
+                    {live && todayHours ? (
                       <p className="font-medium text-emerald-700">
                         🗓 Today&apos;s hours: {todayHours}
                       </p>
+                    ) : null}
+                    {opdDiffers && (live || !!todayHours) ? (
+                      <p>🩺 OPD: {d.consultation_timing}</p>
                     ) : null}
                     {user && (
                       <p className="font-medium text-gray-700">
@@ -735,11 +761,6 @@ export default function DoctorsPage() {
                   {(() => {
                     const t = callTarget(d);
                     if (!t) return null;
-                    const live = statusFreshness(
-                      d.status,
-                      d.status_updated_at,
-                      d.status_updated_by_role
-                    ).isLive;
                     return (
                       <a
                         href={telHref(t.number)}

@@ -321,6 +321,18 @@ review says otherwise.
   `＋ Add "<what you typed>" to the directory`, prefilling the name.
   **Still missing here: the consent checkbox** (pre-launch blocker 2).
 
+- **Done 2026-07-21 (14): patient-first directory card + mobile filters.**
+  Sam's directive: "if a patient gets benefited then this is more valuable for
+  all." Card reading order is now the patient's question order: name → status
+  badge (own full-width row under the name — no more name-vs-chip wrapping) →
+  hours → call. Hours dedupe: the OPD-hours fallback had made cards show the
+  same times up to 3× (chip + emerald today-line + OPD line); now ONE line
+  answers "when do I go" — emerald timetable line only while live, OPD line
+  only when it adds info (`opdDiffers && (live || todayHours)`).
+  Mobile filters: search keeps the full row, the three dropdowns share one
+  compact row (was: four stacked controls filling the first screen).
+  Card padding p-4 on phones.
+
 - **Done 2026-07-21 (13): self-service password change.** `PUT
   /api/account/password` — any signed-in role, requires the CURRENT password
   (a stolen session alone can't lock out the owner), min 8 chars, 5 attempts /
