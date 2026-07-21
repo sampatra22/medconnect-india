@@ -1,6 +1,13 @@
 "use client";
 
 import { useRef, useState } from "react";
+import {
+  detectColumns,
+  findHeaderRow,
+  htmlTableToGrid,
+  looksLikeHtml,
+  normName,
+} from "@/lib/import-parse";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Bulk import UI. The MR drops in the Excel/CSV their company portal exports;
@@ -21,43 +28,6 @@ type ParsedRow = {
   data: Record<string, string>;
   status: "new" | "duplicate" | "invalid";
 };
-
-// field → header spellings seen in the wild (normalized: lowercase, alnum only)
-const HEADER_MAP: Record<string, string[]> = {
-  name: ["name", "doctor", "doctorname", "drname", "dr", "doctorsname"],
-  specialty: ["specialty", "speciality", "spl", "dept", "department", "specialisation", "specialization"],
-  qualification: ["qualification", "qual", "degree", "degrees"],
-  hospital: ["hospital", "institution", "clinic", "hospitalclinic", "hospitalname"],
-  chamber_address: ["address", "chamber", "chamberaddress", "area", "location", "territory", "addr"],
-  phone: ["phone", "mobile", "contact", "phoneno", "mobileno", "contactno", "phonenumber", "mobilenumber"],
-  secretary_contact: ["secretary", "pa", "chamberno", "secretaryno", "clinicno"],
-  consultation_timing: ["timing", "opd", "opdtiming", "consultationtiming", "hours", "time"],
-  mr_visiting_days: ["visitingdays", "mrvisitingdays", "visitdays", "days"],
-  mr_visiting_time: ["visitingtime", "mrvisitingtime", "visittime"],
-  city: ["city", "town", "hq", "headquarter", "headquarters"],
-};
-
-const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-const normName = (s: string) =>
-  s.toLowerCase().replace(/^dr\.?\s*/i, "").replace(/\s+/g, " ").trim();
-
-function detectColumns(headers: string[]): Record<number, string> {
-  const map: Record<number, string> = {};
-  const taken = new Set<string>();
-  headers.forEach((h, i) => {
-    const n = norm(h);
-    if (!n) return;
-    for (const [field, aliases] of Object.entries(HEADER_MAP)) {
-      if (taken.has(field)) continue;
-      if (aliases.includes(n)) {
-        map[i] = field;
-        taken.add(field);
-        return;
-      }
-    }
-  });
-  return map;
-}
 
 export function DoctorBulkImport({
   existing,
@@ -83,20 +53,32 @@ export function DoctorBulkImport({
     setRows([]);
     setFileName(file.name);
     try {
-      // Loaded only when someone actually imports — ~200KB nobody else pays for.
-      const XLSX = await import("xlsx");
-      const wb = XLSX.read(await file.arrayBuffer());
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      const grid = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1, defval: "" }) as unknown as unknown[][];
+      // Many portal ".xls" files are actually saved HTML pages. Sniff the
+      // text first: if it's HTML we parse the real <table> ourselves; only
+      // genuine spreadsheets pay for the SheetJS load (~200KB, on demand).
+      let grid: string[][];
+      const text = await file.text();
+      if (looksLikeHtml(text)) {
+        grid = htmlTableToGrid(text);
+      } else {
+        const XLSX = await import("xlsx");
+        const wb = XLSX.read(await file.arrayBuffer());
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        grid = (
+          XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "" }) as unknown[][]
+        ).map((row) => row.map((c) => String(c ?? "")));
+      }
       if (!grid.length) throw new Error("The file looks empty.");
 
-      const headers = (grid[0] as unknown[]).map((h) => String(h ?? ""));
-      const colMap = detectColumns(headers);
-      if (!Object.values(colMap).includes("name")) {
+      // The header is rarely row one — portals put report titles above it.
+      const found = findHeaderRow(grid);
+      if (!found) {
         throw new Error(
-          "Couldn't find a doctor-name column. The first row should have headers like 'Doctor Name', 'Specialty', 'Address', 'Phone'."
+          "Couldn't find a doctor-name column anywhere in the first rows. The sheet should have a header row with columns like 'Doctor Name', 'Specialty', 'Address', 'Phone'."
         );
       }
+      const { row: headerRow, colMap } = found;
+      const headers = grid[headerRow];
       setDetected(
         Object.entries(colMap).map(([i, f]) => `${headers[Number(i)] || "?"} → ${f.replace(/_/g, " ")}`)
       );
@@ -107,7 +89,7 @@ export function DoctorBulkImport({
       const inFile = new Set<string>();
       const parsed: ParsedRow[] = [];
 
-      for (let r = 1; r < Math.min(grid.length, 501); r++) {
+      for (let r = headerRow + 1; r < Math.min(grid.length, headerRow + 501); r++) {
         const line = grid[r] as unknown[];
         if (!line || line.every((c) => !String(c ?? "").trim())) continue;
         const data: Record<string, string> = {};

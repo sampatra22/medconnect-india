@@ -321,6 +321,19 @@ review says otherwise.
   `＋ Add "<what you typed>" to the directory`, prefilling the name.
   **Still missing here: the consent checkbox** (pre-launch blocker 2).
 
+- **Fixed 2026-07-22 (17): bulk import vs the real world.** Sam's actual
+  portal export failed: it is an **ASP.NET GridView HTML page saved as .xls**
+  (extremely common for Indian pharma portals), with report-title rows above
+  the table and headers like "Listed Doctor Name", "Qual.", "Territory".
+  Parsing moved to React-free `lib/import-parse.ts` (6 unit tests on a
+  synthetic GridView fixture): `looksLikeHtml` sniff → regex `<table>`
+  extraction (entity decode, span unwrap; no DOMParser so Node can test it);
+  `findHeaderRow` scans the first 30 rows for the best-mapping row instead of
+  assuming row 1; fuzzy header fallback (contains-matching) behind exact
+  aliases; Territory/City append to the address. **Verified against Sam's
+  real file: 114 doctors parse cleanly.** Note: portal specialty CODES
+  ("ORT", "SUR") import as-is — MR/admin edit can normalize them later.
+
 - **Done 2026-07-22 (16): bulk doctor import (parking-lot spec, plain code, no
   AI).** MR dashboard → "📄 Import list": company-portal CSV/XLS/XLSX parsed
   IN THE BROWSER (SheetJS `xlsx`, dynamic import so the bundle stays lean —
