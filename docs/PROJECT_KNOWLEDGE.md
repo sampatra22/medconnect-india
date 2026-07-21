@@ -321,6 +321,17 @@ review says otherwise.
   `＋ Add "<what you typed>" to the directory`, prefilling the name.
   **Still missing here: the consent checkbox** (pre-launch blocker 2).
 
+- **Done 2026-07-22 (19): doctor photos + MR public anonymity.**
+  `Doctor.photo` (migration `20260722100000_doctor_photo`, **apply before
+  deploy**): client-side canvas cover-crop to 96px JPEG (~few KB) in the MR
+  form, server validates data-URL shape + ≤60KB. `DoctorAvatar` component:
+  photo, else initials-on-gradient — on every directory card + detail panel.
+  **PRIVACY REVERSAL (Sam's call, 2026-07-22):** public/anonymous readers no
+  longer see an MR's name+company in attribution — serializer `publicView`
+  option nulls them for guests; UI says "Reported by an MR". Signed-in users
+  (any role) still see full identity; audit trail unchanged. PA-link payload
+  anonymizes the same way. Accountability = peers/admins; privacy = public.
+
 - **Fixed 2026-07-22 (18): MR Doctors-tab search = name only.** The search box
   matched name+specialty+hospital+ADDRESS in one string, so results felt
   random ("kar" matched street names across half the directory). Now the same

@@ -31,6 +31,7 @@ type Doctor = {
   status_updated_by_role?: string | null;
   status_updated_by_name?: string | null;
   status_updated_by_company?: string | null;
+  photo?: string | null;
   // Module 4: doctor-shared availability layers
   timetable?: Record<string, string> | null;
   today_plan?: {
@@ -321,6 +322,7 @@ export default function MrDashboard() {
       consultation_timing: d.consultation_timing ?? "",
       mr_visiting_days: d.mr_visiting_days ?? "",
       mr_visiting_time: d.mr_visiting_time ?? "",
+      photo: d.photo ?? "",
     });
     setShowAdd(true);
     await loadVocab();
@@ -334,6 +336,30 @@ export default function MrDashboard() {
       if (r.ok) setVocab(await r.json());
     } catch {
       /* curated defaults remain */
+    }
+  }
+
+  // Camera shots are megabytes; the directory needs a thumbnail. Cover-crop
+  // to a 96px square JPEG in a canvas — the payload lands at a few KB.
+  async function photoToDataUrl(file: File): Promise<string> {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise<HTMLImageElement>((res, rej) => {
+        const i = new Image();
+        i.onload = () => res(i);
+        i.onerror = rej;
+        i.src = url;
+      });
+      const S = 96;
+      const canvas = document.createElement("canvas");
+      canvas.width = S;
+      canvas.height = S;
+      const ctx = canvas.getContext("2d")!;
+      const side = Math.min(img.width, img.height);
+      ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, S, S);
+      return canvas.toDataURL("image/jpeg", 0.82);
+    } finally {
+      URL.revokeObjectURL(url);
     }
   }
 
@@ -1371,6 +1397,45 @@ export default function MrDashboard() {
                 <label className="mb-1 block text-xs font-semibold text-slate-500">Doctor name *</label>
                 <input value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Dr. Ananya Sen"
                   className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-blue-500" />
+              </div>
+
+              {/* Photo (optional). Downscaled in the browser to a ~96px JPEG
+                  before it ever leaves the phone — a 4MB camera shot becomes
+                  a few KB, and the server enforces the same ceiling. */}
+              <div className="flex items-center gap-3">
+                {form.photo ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={form.photo} alt="Doctor" className="h-12 w-12 flex-none rounded-xl object-cover" />
+                ) : (
+                  <div className="grid h-12 w-12 flex-none place-items-center rounded-xl bg-slate-100 text-lg">📷</div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <label className="block text-xs font-semibold text-slate-500">Photo (optional)</label>
+                  <div className="mt-1 flex gap-2">
+                    <label className="cursor-pointer rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                      {form.photo ? "Change" : "Add photo"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) void photoToDataUrl(f).then((p) => setForm((fm) => ({ ...fm, photo: p })));
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                    {form.photo ? (
+                      <button
+                        type="button"
+                        onClick={() => setForm((fm) => ({ ...fm, photo: "" }))}
+                        className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-400 hover:text-slate-600"
+                      >
+                        Remove
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
               </div>
 
               <div>

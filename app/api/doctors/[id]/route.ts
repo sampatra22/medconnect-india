@@ -113,6 +113,28 @@ export const PATCH = guarded(async (
     changes[key] = { from: prev || null, to: next || null };
   }
 
+  // Photo: a small client-downscaled data URL, or null/"" to remove it.
+  // Validated by shape and size — this field must never become a blob dump.
+  if (b.photo !== undefined) {
+    const p = b.photo === null ? "" : String(b.photo);
+    if (p === "") {
+      if (doctor.photo) {
+        data.photo = null;
+        changes.photo = { from: "set", to: null };
+      }
+    } else if (/^data:image\/(jpeg|png|webp);base64,/.test(p) && p.length <= 60_000) {
+      if (p !== doctor.photo) {
+        data.photo = p;
+        changes.photo = { from: doctor.photo ? "set" : null, to: "updated" };
+      }
+    } else {
+      return NextResponse.json(
+        { error: "Photo must be a small JPEG/PNG image." },
+        { status: 400 }
+      );
+    }
+  }
+
   // Coordinates ride along with a chosen address (from the map lookup). They
   // are never user-typed, so they're validated as a pair and bounded.
   const lat = Number(b.latitude);

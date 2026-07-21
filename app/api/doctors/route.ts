@@ -102,7 +102,9 @@ export const GET = guarded(async (request: NextRequest) => {
   }
 
   return NextResponse.json({
-    doctors: doctors.map(serializeDoctor),
+    // Guests get MR attribution anonymized ("Reported by an MR");
+    // signed-in users of any role see the full name + company.
+    doctors: doctors.map((d) => serializeDoctor(d, { publicView: !u?.id })),
     total,
     page,
     per,
@@ -202,6 +204,12 @@ export const POST = guarded(async (request: NextRequest) => {
       consentAt: new Date(),
       consentByName: user.name ?? user.email ?? "Unknown",
       consentNote: clamp(b?.consent_note, 120) || null,
+      // Small avatar (validated shape + size), when provided at entry.
+      ...(typeof b?.photo === "string" &&
+      /^data:image\/(jpeg|png|webp);base64,/.test(b.photo) &&
+      b.photo.length <= 60_000
+        ? { photo: b.photo }
+        : {}),
       // Coordinates from the map lookup, when the MR picked a searched
       // address. Captured now because re-collecting them later means walking
       // every chamber again — and Directions depends on having them.

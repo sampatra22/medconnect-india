@@ -47,7 +47,10 @@ function view(d: {
     patients_left: d.patientsLeft,
     patients_source: d.patientsSource,
     status_updated_at: d.statusUpdatedAt ? d.statusUpdatedAt.toISOString() : null,
-    status_updated_by_name: d.statusUpdatedByName,
+    // The PA page is unauthenticated → same MR-anonymity rule as the public.
+    status_updated_by_name: ["mr", "medical_representative"].includes(d.statusUpdatedByRole ?? "")
+      ? null
+      : d.statusUpdatedByName,
     freshness: statusFreshness(d.status, d.statusUpdatedAt, d.statusUpdatedByRole),
     today_hours: timetableFallback(tt, istDayKey(), d.consultationTiming),
     // For the PA's share card — the number that answers (desk first). These

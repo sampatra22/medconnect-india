@@ -49,6 +49,11 @@ model Doctor {
   chamberAddress      String
   latitude            Float?
   longitude           Float?
+  // Tiny avatar as a data URL (client-downscaled to ~96px JPEG, ≤~30KB).
+  // Deliberately in the DB, not S3: at directory scale this is a few MB
+  // total, zero new infrastructure, and one less secret to manage. Revisit
+  // only if photos ever grow past thumbnails.
+  photo               String?
   consultationTiming  String
   mrVisitingTime      String?
   mrVisitingDays      String? // e.g. "Mon, Wed, Fri"

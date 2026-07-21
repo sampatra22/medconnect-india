@@ -13,6 +13,7 @@ import { statusFreshness, timetableFallback } from "@/lib/status-freshness";
 import { doctorShareMessage } from "@/lib/doctor-share";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { DoctorAvatar } from "@/components/doctor-avatar";
 
 // Role lists come from the central config in lib/roles.ts — never hard-code them.
 const CAN_STATUS = rolesWith("set_doctor_status");
@@ -55,6 +56,7 @@ type Doctor = {
   today_plan?: TodayPlan | null;
   languages: string[];
   status: "available" | "busy" | "holiday" | "no_mr_today" | "token_full" | "opd_closed";
+  photo?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   patients_left: number | null;
@@ -557,7 +559,9 @@ export default function DoctorsPage() {
                   className="bg-white rounded-2xl shadow-sm p-4 sm:p-5 flex flex-col cursor-pointer hover:shadow-md transition-shadow"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div>
+                    <div className="flex items-start gap-3 min-w-0">
+                      <DoctorAvatar name={d.name} photo={d.photo} size={48} />
+                      <div className="min-w-0">
                       <h2 className="font-bold text-gray-800 flex items-center gap-1.5">
                         <span>{d.name}</span>
                         {d.verified === false && (
@@ -583,6 +587,7 @@ export default function DoctorsPage() {
                             : "⚠ No consent recorded"}
                         </p>
                       ) : null}
+                      </div>
                     </div>
                     {/* The right column keeps only small chips — the status
                         badge lives below the name at full width, so long
@@ -902,10 +907,13 @@ export default function DoctorsPage() {
               <div className="w-full sm:max-w-md max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl bg-white p-5 shadow-xl">
                 <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-gray-200 sm:hidden" />
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h2 className="text-lg font-bold text-gray-800 leading-tight">{d.name}</h2>
-                    <p className="text-sm font-medium text-blue-700">{d.specialty}</p>
-                    <p className="text-xs text-gray-500">{d.qualification}</p>
+                  <div className="flex items-start gap-3 min-w-0">
+                    <DoctorAvatar name={d.name} photo={d.photo} size={56} />
+                    <div className="min-w-0">
+                      <h2 className="text-lg font-bold text-gray-800 leading-tight">{d.name}</h2>
+                      <p className="text-sm font-medium text-blue-700">{d.specialty}</p>
+                      <p className="text-xs text-gray-500">{d.qualification}</p>
+                    </div>
                   </div>
                   <button
                     onClick={() => setDetailDoc(null)}

@@ -42,10 +42,26 @@ export function serializeDayPlan(p: DoctorDayPlan) {
 }
 
 // Keeps the JSON shape the frontend already understands (snake_case).
+export type SerializeDoctorOpts = {
+  /**
+   * True when the payload goes to an ANONYMOUS reader (public directory,
+   * PA link). An MR's name and company are then withheld from attribution —
+   * the public sees "Reported by an MR"; the tier still drives the trust
+   * styling. Signed-in users and the audit trail keep the full identity:
+   * accountability is to peers and admins, privacy is to the public.
+   */
+  publicView?: boolean;
+};
+
+const MR_ROLES = new Set(["mr", "medical_representative"]);
+
 export function serializeDoctor(
-  d: Doctor & { updates?: DoctorUpdate[]; dayPlans?: DoctorDayPlan[] }
+  d: Doctor & { updates?: DoctorUpdate[]; dayPlans?: DoctorDayPlan[] },
+  opts: SerializeDoctorOpts = {}
 ) {
+  const hideMr = !!opts.publicView && MR_ROLES.has(d.statusUpdatedByRole ?? "");
   return {
+    photo: d.photo ?? null,
     id: d.id,
     name: d.name,
     specialty: d.specialty,
@@ -85,10 +101,11 @@ export function serializeDoctor(
     patients_source: d.patientsSource,
     status_updated_at: d.statusUpdatedAt ? d.statusUpdatedAt.toISOString() : null,
     status_updated_by_role: d.statusUpdatedByRole,
-    status_updated_by_name: d.statusUpdatedByName,
-    status_updated_by_id: d.statusUpdatedById,
-    // Public only in this attribution context — the accountability signal.
-    status_updated_by_company: d.statusUpdatedByCompany ?? null,
+    status_updated_by_name: hideMr ? null : d.statusUpdatedByName,
+    status_updated_by_id: hideMr ? null : d.statusUpdatedById,
+    // Visible to signed-in peers/admins; withheld from the anonymous public
+    // (2026-07-22 privacy decision — the public sees "Reported by an MR").
+    status_updated_by_company: hideMr ? null : (d.statusUpdatedByCompany ?? null),
     // Module 4 · the trust verdict, computed server-side in ONE place.
     // Shipping this alongside the raw fields means a client can never render a
     // stale status as live by forgetting to apply the rule itself.

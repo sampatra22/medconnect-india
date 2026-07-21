@@ -170,11 +170,14 @@ export function StatusAttribution({
   const who = [doctor.status_updated_by_name, doctor.status_updated_by_company]
     .filter(Boolean)
     .join(", ");
+  // The API withholds an MR's name from anonymous readers (2026-07-22 privacy
+  // decision); the honest public phrasing is the role, not a blank.
+  const by = who ? ` by ${who}` : !f.isVerifiedSource && f.ageMinutes !== null ? " by an MR" : "";
 
   return (
     <span className={`text-xs text-gray-400 ${className}`}>
       {f.isLive ? (f.isVerifiedSource ? "Confirmed" : "Reported") : "Last confirmed"}
-      {who ? ` by ${who}` : ""} · {describeAge(f.ageMinutes)}
+      {by} · {describeAge(f.ageMinutes)}
       {f.confidence === "ageing" && f.asOf ? ` (as of ${f.asOf})` : ""}
     </span>
   );
