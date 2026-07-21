@@ -321,6 +321,15 @@ review says otherwise.
   `＋ Add "<what you typed>" to the directory`, prefilling the name.
   **Still missing here: the consent checkbox** (pre-launch blocker 2).
 
+- **Done 2026-07-21 (13): self-service password change.** `PUT
+  /api/account/password` — any signed-in role, requires the CURRENT password
+  (a stolen session alone can't lock out the owner), min 8 chars, 5 attempts /
+  15 min. `/account` page (gated via proxy matcher) linked from: MR header
+  ("Hi, name" chip), doctor dashboard, admin nav ("🔐 Account"), generic
+  dashboard quick actions. **"Forgot password" deliberately NOT built** — no
+  email channel exists; admins recreate accounts instead, and the page says
+  so. **Sam's action: change the admin password from sam123 now.**
+
 - **Done 2026-07-21 (12): audit-driven build — fallback, edit, GPS.**
   Audit of live data found: only **1 of 206** doctors had a weekly timetable,
   so 205 fell through to "Not confirmed today" every morning while their OPD

@@ -750,7 +750,9 @@ export default function MrDashboard() {
           <Link href="/doctors" className="hidden sm:inline rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">
             👁 Public view
           </Link>
-          <div className="text-sm text-slate-600">Hi, <span className="font-semibold text-slate-900">{mr.name || "MR"}</span> 👋</div>
+          <Link href="/account" title="Account settings" className="text-sm text-slate-600 hover:text-slate-900">
+            Hi, <span className="font-semibold text-slate-900">{mr.name || "MR"}</span> 👋
+          </Link>
           <button onClick={() => signOut({ callbackUrl: "/login" })} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-50">Log out</button>
         </div>
       </header>

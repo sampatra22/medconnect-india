@@ -43,6 +43,16 @@ export default function Dashboard() {
             Quick actions
           </p>
           <Link
+            href="/account"
+            className="mb-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 rounded-xl px-4 py-3 transition"
+          >
+            <span>
+              <span className="block font-semibold text-gray-800">Account settings</span>
+              <span className="block text-xs text-gray-500">Change your password</span>
+            </span>
+            <span aria-hidden>🔐</span>
+          </Link>
+          <Link
             href="/doctors"
             className="flex items-center justify-between bg-blue-50 hover:bg-blue-100 rounded-xl px-4 py-3 transition"
           >

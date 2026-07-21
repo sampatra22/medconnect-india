@@ -367,6 +367,12 @@ export default function DoctorDashboard() {
             >
               👁 Public view
             </Link>
+            <Link
+              href="/account"
+              className="bg-white border border-gray-200 text-gray-600 text-sm font-semibold px-3 py-2 rounded-lg hover:bg-gray-50 transition"
+            >
+              🔐 Account
+            </Link>
             <button
               onClick={() => signOut({ callbackUrl: "/login" })}
               className="bg-white border border-gray-200 text-gray-600 text-sm font-semibold px-3 py-2 rounded-lg hover:bg-gray-50 transition"

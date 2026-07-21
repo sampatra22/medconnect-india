@@ -14,6 +14,7 @@ const LINKS = [
   { href: "/admin/doctors", label: "🩺 Doctor Approvals" },
   { href: "/admin/users", label: "👥 Users" },
   { href: "/doctors", label: "📖 Directory" },
+  { href: "/account", label: "🔐 Account" },
 ];
 
 export function AdminNav() {
