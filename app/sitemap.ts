@@ -1,15 +1,15 @@
 import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/prisma";
 import { doctorSlug } from "@/lib/doctor-slug";
-
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://medconnect-india.vercel.app";
+import { SITE_URL, SITE_LAUNCHED } from "@/lib/site";
 
 // Static routes plus every VERIFIED doctor's own page — this is how a patient
 // searching "<doctor> chamber timing" finds us. Unverified profiles are never
 // listed (they aren't public). Wrapped so a DB hiccup degrades to the static
 // map rather than a broken sitemap.
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  // Empty until launch — no crawler should be handed URLs to a staging site.
+  if (!SITE_LAUNCHED) return [];
   const now = new Date();
   const staticRoutes: MetadataRoute.Sitemap = [
     { url: SITE_URL, lastModified: now, changeFrequency: "daily", priority: 1 },

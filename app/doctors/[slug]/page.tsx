@@ -6,6 +6,7 @@ import { istDayKey } from "@/lib/ist";
 import { timetableFallback } from "@/lib/status-freshness";
 import { doctorShareMessage } from "@/lib/doctor-share";
 import { doctorSlug, idFromSlug } from "@/lib/doctor-slug";
+import { SITE_URL, preLaunchRobots } from "@/lib/site";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { DoctorAvatar } from "@/components/doctor-avatar";
@@ -17,8 +18,6 @@ import { DoctorActions } from "./doctor-actions";
 // doctors get a page; anything else is a 404 (same as "no such doctor" — an
 // unverified profile must never be discoverable).
 // ─────────────────────────────────────────────────────────────────────────────
-
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://medconnect-india.vercel.app";
 
 const DAY_ORDER = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const DAY_SHORT: Record<string, string> = {
@@ -56,6 +55,7 @@ export async function generateMetadata(
   return {
     title,
     description,
+    robots: preLaunchRobots,
     alternates: { canonical: url },
     openGraph: { title, description, url, type: "profile" },
     twitter: { card: "summary_large_image", title, description },
@@ -100,18 +100,37 @@ export default async function DoctorPage(
   });
   const shareHref = `https://wa.me/?text=${encodeURIComponent(shareMsg)}`;
 
-  // Physician structured data — lets search show a rich result.
+  // Structured data — a graph so search AND answer-engines get the full
+  // picture: the physician (with local geo signals), and where the page sits.
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "Physician",
-    name: d.name,
-    medicalSpecialty: d.specialty,
-    address: { "@type": "PostalAddress", streetAddress: d.chamberAddress },
-    ...(t ? { telephone: t.number } : {}),
-    ...(d.latitude != null && d.longitude != null
-      ? { geo: { "@type": "GeoCoordinates", latitude: d.latitude, longitude: d.longitude } }
-      : {}),
-    url: pageUrl,
+    "@graph": [
+      {
+        "@type": "Physician",
+        "@id": `${pageUrl}#physician`,
+        name: d.name,
+        medicalSpecialty: d.specialty,
+        ...(d.qualification ? { description: `${d.specialty}, ${d.qualification}` } : {}),
+        address: {
+          "@type": "PostalAddress",
+          streetAddress: d.chamberAddress,
+          addressCountry: "IN",
+        },
+        ...(d.hospital ? { worksFor: { "@type": "Hospital", name: d.hospital } } : {}),
+        ...(t ? { telephone: t.number } : {}),
+        ...(d.latitude != null && d.longitude != null
+          ? { geo: { "@type": "GeoCoordinates", latitude: d.latitude, longitude: d.longitude } }
+          : {}),
+        url: pageUrl,
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Doctors", item: `${SITE_URL}/doctors` },
+          { "@type": "ListItem", position: 2, name: d.name, item: pageUrl },
+        ],
+      },
+    ],
   };
 
   return (

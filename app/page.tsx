@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { MrDoorCta } from "@/components/mr-door-cta";
+import { orgAndSiteJsonLd, faqJsonLd, FAQ } from "@/lib/structured-data";
 import { Search, MapPin, Clock, BadgeCheck } from "lucide-react";
 
 // Simplified homepage: one job for the public (find a doctor, see live
@@ -11,6 +12,9 @@ import { Search, MapPin, Clock, BadgeCheck } from "lucide-react";
 export default function Home() {
   return (
     <main className="min-h-screen bg-white dark:bg-slate-950 flex flex-col">
+      {/* SEO: who we are + the search action. AEO/GEO: the FAQ graph below. */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(orgAndSiteJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
       <SiteHeader />
 
       {/* Hero: one headline, one search box */}
@@ -100,6 +104,24 @@ export default function Home() {
             </p>
           </div>
           <MrDoorCta />
+        </div>
+      </section>
+
+      {/* Visible FAQ — genuinely useful to patients, and the content answer
+          engines quote. Kept in sync with the FAQ schema (one source array). */}
+      <section className="bg-white dark:bg-slate-950">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-14">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white text-center">
+            Common questions
+          </h2>
+          <div className="mt-8 space-y-6">
+            {FAQ.map((f) => (
+              <div key={f.q}>
+                <h3 className="font-semibold text-slate-900 dark:text-white">{f.q}</h3>
+                <p className="mt-1 text-slate-600 dark:text-slate-300 leading-relaxed">{f.a}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 

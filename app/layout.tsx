@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
+import { SITE_URL, preLaunchRobots } from "@/lib/site";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -17,8 +18,6 @@ const geistMono = Geist_Mono({
 // without these tags a shared link renders as a bare grey URL. Description
 // leads with the patient benefit — patients are the end customer, and MRs and
 // chambers benefit because patients arrive.
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://medconnect-india.vercel.app";
 const DESCRIPTION =
   "See which doctors are sitting today before you travel. Live availability, chamber timings and a number that answers — for patients, chamber staff and medical representatives across India.";
 
@@ -30,6 +29,14 @@ export const metadata: Metadata = {
   },
   description: DESCRIPTION,
   applicationName: "MedConnect India",
+  keywords: [
+    "doctor availability", "doctor chamber timing", "OPD timing",
+    "find a doctor", "doctor near me", "Kolkata doctors",
+    "live doctor status", "chamber address", "MedConnect India",
+  ],
+  // Noindex until launch (lib/site.ts) — the whole staging site stays out of
+  // search and AI answer-engines until the one env switch is flipped.
+  robots: preLaunchRobots,
   openGraph: {
     type: "website",
     siteName: "MedConnect India",

@@ -321,6 +321,23 @@ review says otherwise.
   `＋ Add "<what you typed>" to the directory`, prefilling the name.
   **Still missing here: the consent checkbox** (pre-launch blocker 2).
 
+- **Done 2026-07-22 (24): SEO/GEO/AEO behind a launch gate.** `lib/site.ts`
+  `SITE_LAUNCHED` (env `NEXT_PUBLIC_SITE_LAUNCHED`, default false). While
+  false: EVERY page carries `robots noindex` (root + doctor pages), robots.txt
+  returns `Disallow: /`, sitemap returns [], `/llms.txt` declines to describe
+  the product. **Launch = set `NEXT_PUBLIC_SITE_LAUNCHED=true` in Vercel +
+  redeploy; nothing else changes.** Built (all live once launched):
+  • SEO — root keywords, per-doctor canonical/OG/Twitter, `MedicalOrganization`
+    + `WebSite` (with SearchAction) on homepage, `Physician` + `BreadcrumbList`
+    graph on doctor pages, sitemap lists every VERIFIED doctor only.
+  • AEO — visible "Common questions" FAQ on the homepage + `FAQPage` JSON-LD
+    from one shared array (`lib/structured-data.ts`) so text and schema can't
+    drift; answer-engine-friendly factual Q&A.
+  • GEO — `/llms.txt` describing the product, canonical pages, and "not to be
+    represented" guardrails for AI answer-engines.
+  Only public (verified) doctor data is ever exposed; MR identity and private
+  fields stay out. Gate flip verified both directions.
+
 - **Done 2026-07-22 (23): per-doctor public pages (SEO + share targets).**
   `/doctors/[slug]` — server-rendered (Google indexes it fully), slug =
   `name-<id>`, id is the last hyphen segment (CUIDs have no hyphens;
