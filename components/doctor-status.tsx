@@ -124,10 +124,15 @@ export function DoctorStatusBadge({ doctor }: { doctor: StatusFields }) {
   const ageing = f.confidence === "ageing";
   const reported = !f.isVerifiedSource;
 
+  // The live "breathing" ring belongs only to a doctor/clinic-confirmed,
+  // still-fresh status — the strongest possible "in right now" signal. An
+  // ageing or MR-reported status is honestly quieter: a plain dot.
+  const showPulse = f.confidence === "fresh" && !reported;
+
   return (
     <span
       className={[
-        "inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full whitespace-nowrap",
+        "inline-flex items-center gap-1.5 text-[13px] px-2.5 py-1 rounded-full whitespace-nowrap",
         ageing ? "font-medium opacity-70" : "font-semibold",
         // An MR's second-hand report is dashed and never carries a tick.
         reported ? "border border-dashed border-current bg-transparent" : strong.chip,
@@ -139,7 +144,9 @@ export function DoctorStatusBadge({ doctor }: { doctor: StatusFields }) {
           : "Confirmed by the doctor or their clinic."
       }
     >
-      <span className={`w-1.5 h-1.5 rounded-full ${reported ? "bg-gray-400" : strong.dot}`} />
+      <span
+        className={`relative inline-block w-2 h-2 rounded-full ${reported ? "bg-gray-400" : strong.dot} ${showPulse ? "mc-live" : ""}`}
+      />
       {label}
       {!reported && !ageing && <span className="text-[10px]">✓</span>}
     </span>

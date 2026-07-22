@@ -1,12 +1,19 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Atkinson_Hyperlegible, Geist_Mono } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
 import { SITE_URL, preLaunchRobots } from "@/lib/site";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Atkinson Hyperlegible — designed by the Braille Institute for low-vision
+// readers: exaggerated letterform differences (I / l / 1, O / 0, b / d) and a
+// tall x-height that stays clear at small sizes and on cheap phone screens.
+// Chosen deliberately for the audience — a sick patient squinting at a chamber
+// card is exactly who this typeface exists for.
+const appSans = Atkinson_Hyperlegible({
+  weight: ["400", "700"],
+  variable: "--font-app-sans",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
@@ -60,7 +67,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${appSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       {/* suppressHydrationWarning: browser extensions (password managers,
           Grammarly, dark-mode) inject attributes into <body> before React

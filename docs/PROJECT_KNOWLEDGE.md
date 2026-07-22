@@ -321,6 +321,20 @@ review says otherwise.
   `＋ Add "<what you typed>" to the directory`, prefilling the name.
   **Still missing here: the consent checkbox** (pre-launch blocker 2).
 
+- **Done 2026-07-22 (25): accessibility + polish pass.** Global font swapped
+  to **Atkinson Hyperlegible** (Braille Institute's low-vision typeface —
+  distinct I/l/1, O/0; tall x-height) via `--font-app-sans`; also fixed a
+  self-referential `--font-sans: var(--font-sans)` in globals that had been
+  silently falling back to a system font. Directory cards: bigger name
+  (base→lg), specialty (→base semibold), darker secondary text (gray-500/400 →
+  600/700/900) for contrast, roomier line spacing. **Meaningful motion:** a
+  soft "breathing" ring (`.mc-live`, CSS keyframe) on the status dot — applied
+  ONLY to fresh, doctor/clinic-confirmed statuses (the strongest "in right
+  now" cue; ageing/MR-reported stay a plain dot). Tactile `.mc-card-hover`
+  lift. Both wrapped in `prefers-reduced-motion: reduce` so motion-sensitive
+  users opt out automatically. Font weights 400/700 verified against Next's
+  font-data before use.
+
 - **Done 2026-07-22 (24): SEO/GEO/AEO behind a launch gate.** `lib/site.ts`
   `SITE_LAUNCHED` (env `NEXT_PUBLIC_SITE_LAUNCHED`, default false). While
   false: EVERY page carries `robots noindex` (root + doctor pages), robots.txt

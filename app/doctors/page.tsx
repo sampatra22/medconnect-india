@@ -561,20 +561,20 @@ export default function DoctorsPage() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && e.target === e.currentTarget) setDetailDoc(d);
                   }}
-                  className="bg-white rounded-2xl shadow-sm p-4 sm:p-5 flex flex-col cursor-pointer hover:shadow-md transition-shadow"
+                  className="mc-card-hover bg-white rounded-2xl shadow-sm p-4 sm:p-5 flex flex-col cursor-pointer hover:shadow-md"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-start gap-3 min-w-0">
                       <DoctorAvatar name={d.name} photo={d.photo} size={48} />
                       <div className="min-w-0">
-                      <h2 className="font-bold text-gray-800 flex items-center gap-1.5">
+                      <h2 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-1.5 leading-tight">
                         <span>{d.name}</span>
                         {d.verified === false && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 whitespace-nowrap">⏳ Pending</span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 whitespace-nowrap">⏳ Pending</span>
                         )}
                       </h2>
-                      <p className="text-sm text-blue-700 font-medium">{d.specialty}</p>
-                      <p className="text-xs text-gray-500">{d.qualification}</p>
+                      <p className="text-sm sm:text-base text-blue-700 font-semibold">{d.specialty}</p>
+                      <p className="text-sm text-gray-600">{d.qualification}</p>
                       {/* Attribution is MR-internal — hide from the public */}
                       {user && d.added_by_name ? (
                         <p className="text-[11px] text-gray-400 mt-0.5">Added by {d.added_by_name} ({roleLabel(d.added_by_role)})</p>
@@ -704,7 +704,7 @@ export default function DoctorsPage() {
                     </div>
                   )}
 
-                  <div className="mt-3 text-sm text-gray-600 space-y-1 flex-1">
+                  <div className="mt-3 text-sm sm:text-[15px] text-gray-700 space-y-1.5 flex-1">
                     <p>🏥 {d.hospital}</p>
                     <p>📍 {d.chamber_address}</p>
                     {/* One line answers "when do I go?" — never three. The
