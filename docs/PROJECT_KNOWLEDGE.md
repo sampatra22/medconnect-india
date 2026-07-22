@@ -321,6 +321,15 @@ review says otherwise.
   `＋ Add "<what you typed>" to the directory`, prefilling the name.
   **Still missing here: the consent checkbox** (pre-launch blocker 2).
 
+- **Fixed 2026-07-22 (26): public attribution is role-only for EVERY role.**
+  The earlier anonymity change hid only MR names; admin/doctor/clinic names
+  still showed ("Last confirmed by Sam Patra"). Now `serializeDoctor`
+  `publicView` nulls name+company+id for ALL roles; `StatusAttribution` falls
+  back to a role label via `publicActor()` — "the doctor" / "chamber staff" /
+  "the MedConnect team" (admin) / "an MR". Signed-in peers/admins still see
+  the real name (EditorProfile line, gated on `user`); audit trail unchanged.
+  E2E now asserts NO name/company/id of any role leaks to a guest.
+
 - **Done 2026-07-22 (25): accessibility + polish pass.** Global font swapped
   to **Atkinson Hyperlegible** (Braille Institute's low-vision typeface —
   distinct I/l/1, O/0; tall x-height) via `--font-app-sans`; also fixed a

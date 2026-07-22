@@ -28,6 +28,19 @@ export type StatusFields = {
   consultation_timing?: string | null;
 };
 
+// How an updater is named to the PUBLIC — by role, never by person. "the
+// MedConnect team" is the honest public face of an admin edit (admin = us).
+function publicActor(role: string | null | undefined): string {
+  switch (role) {
+    case "doctor": return "the doctor";
+    case "clinic_staff": return "chamber staff";
+    case "admin": return "the MedConnect team";
+    case "mr":
+    case "medical_representative": return "an MR";
+    default: return "";
+  }
+}
+
 export const STATUS_LABEL: Record<string, string> = {
   available: "Available",
   busy: "Busy",
@@ -174,12 +187,14 @@ export function StatusAttribution({
   );
   if (f.ageMinutes === null) return null;
 
+  // Signed-in peers see the real name + company; the public API nulls both,
+  // so `who` is empty in public view and we fall back to the ROLE — no
+  // individual is ever named to an anonymous reader.
   const who = [doctor.status_updated_by_name, doctor.status_updated_by_company]
     .filter(Boolean)
     .join(", ");
-  // The API withholds an MR's name from anonymous readers (2026-07-22 privacy
-  // decision); the honest public phrasing is the role, not a blank.
-  const by = who ? ` by ${who}` : !f.isVerifiedSource && f.ageMinutes !== null ? " by an MR" : "";
+  const actor = who || publicActor(doctor.status_updated_by_role);
+  const by = actor ? ` by ${actor}` : "";
 
   return (
     <span className={`text-xs text-gray-400 ${className}`}>

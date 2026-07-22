@@ -45,21 +45,20 @@ export function serializeDayPlan(p: DoctorDayPlan) {
 export type SerializeDoctorOpts = {
   /**
    * True when the payload goes to an ANONYMOUS reader (public directory,
-   * PA link). An MR's name and company are then withheld from attribution —
-   * the public sees "Reported by an MR"; the tier still drives the trust
-   * styling. Signed-in users and the audit trail keep the full identity:
-   * accountability is to peers and admins, privacy is to the public.
+   * PA link). NO individual's name reaches the public — not an MR's, not an
+   * admin's. The public sees only the ROLE ("Confirmed by the doctor",
+   * "Reported by an MR"), which is enough to judge trust; the tier still
+   * drives the styling. Signed-in users and the audit trail keep full
+   * identity: accountability is to peers and admins, privacy is to the public.
    */
   publicView?: boolean;
 };
-
-const MR_ROLES = new Set(["mr", "medical_representative"]);
 
 export function serializeDoctor(
   d: Doctor & { updates?: DoctorUpdate[]; dayPlans?: DoctorDayPlan[] },
   opts: SerializeDoctorOpts = {}
 ) {
-  const hideMr = !!opts.publicView && MR_ROLES.has(d.statusUpdatedByRole ?? "");
+  const hideIdentity = !!opts.publicView;
   return {
     photo: d.photo ?? null,
     id: d.id,
@@ -100,12 +99,12 @@ export function serializeDoctor(
     patients_left: d.patientsLeft,
     patients_source: d.patientsSource,
     status_updated_at: d.statusUpdatedAt ? d.statusUpdatedAt.toISOString() : null,
+    // Role always travels (it drives the public "by the doctor / an MR" text
+    // and the trust styling); the person behind it never does, in public view.
     status_updated_by_role: d.statusUpdatedByRole,
-    status_updated_by_name: hideMr ? null : d.statusUpdatedByName,
-    status_updated_by_id: hideMr ? null : d.statusUpdatedById,
-    // Visible to signed-in peers/admins; withheld from the anonymous public
-    // (2026-07-22 privacy decision — the public sees "Reported by an MR").
-    status_updated_by_company: hideMr ? null : (d.statusUpdatedByCompany ?? null),
+    status_updated_by_name: hideIdentity ? null : d.statusUpdatedByName,
+    status_updated_by_id: hideIdentity ? null : d.statusUpdatedById,
+    status_updated_by_company: hideIdentity ? null : (d.statusUpdatedByCompany ?? null),
     // Module 4 · the trust verdict, computed server-side in ONE place.
     // Shipping this alongside the raw fields means a client can never render a
     // stale status as live by forgetting to apply the rule itself.

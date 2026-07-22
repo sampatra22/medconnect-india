@@ -88,13 +88,14 @@ async function main() {
   const pub = await req(guest, "GET", "/api/doctors?per=3");
   check("public directory readable without login", pub.status === 200 && Array.isArray(pub.data?.doctors));
   check("public paging shape (total/page/has_more)", typeof pub.data?.total === "number" && "has_more" in (pub.data ?? {}));
-  const mrUpdated = (await req(guest, "GET", "/api/doctors?per=500")).data?.doctors?.find(
-    (d) => ["mr", "medical_representative"].includes(d.status_updated_by_role ?? "")
+  const allPublic = (await req(guest, "GET", "/api/doctors?per=500")).data?.doctors ?? [];
+  const anyNamed = allPublic.find(
+    (d) => d.status_updated_by_name != null || d.status_updated_by_company != null || d.status_updated_by_id != null
   );
   check(
-    "MR identity hidden from public attribution",
-    !mrUpdated || (mrUpdated.status_updated_by_name == null && mrUpdated.status_updated_by_company == null),
-    mrUpdated ? `saw name=${mrUpdated.status_updated_by_name}` : "no MR-updated doctor to check"
+    "NO updater identity (any role) leaks to the public",
+    !anyNamed,
+    anyNamed ? `leaked name=${anyNamed.status_updated_by_name} role=${anyNamed.status_updated_by_role}` : ""
   );
   const q = await req(guest, "GET", "/api/doctors?q=anjali");
   check("name search finds Dr. Anjali", q.data?.doctors?.some((d) => /anjali/i.test(d.name)));
