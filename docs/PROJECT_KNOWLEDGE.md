@@ -321,6 +321,20 @@ review says otherwise.
   `＋ Add "<what you typed>" to the directory`, prefilling the name.
   **Still missing here: the consent checkbox** (pre-launch blocker 2).
 
+- **Done 2026-07-22 (23): per-doctor public pages (SEO + share targets).**
+  `/doctors/[slug]` — server-rendered (Google indexes it fully), slug =
+  `name-<id>`, id is the last hyphen segment (CUIDs have no hyphens;
+  `lib/doctor-slug.ts` + 4 tests). **Verified-only → 404 otherwise** (an
+  unverified profile must never be discoverable). generateMetadata
+  (title/description/canonical/OG/Twitter) + Physician JSON-LD (rich result).
+  Interactive strip (live badge + call/directions/share) split into a client
+  child so the page stays a server component. MR identity withheld (public =
+  anonymous). **Share links + card "share" now point to the doctor's own page,
+  not `?q=` search** — a WhatsApp forward lands on ONE doctor. Detail panel
+  gains "Open full page ↗". `sitemap.ts` now async, lists every verified
+  doctor (degrades to static on DB error). This is the patient-acquisition
+  compounder: search + forwards both resolve to a live, indexable page.
+
 - **Fixed 2026-07-22 (22): "log in twice" race — all roles.** `signIn(redirect:
   false)` sets the cookie, but the client `SessionProvider` (read by every
   dashboard's `useSession`) hadn't refetched it, so `router.push` landed on a

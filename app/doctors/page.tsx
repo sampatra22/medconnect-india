@@ -15,6 +15,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { DoctorAvatar } from "@/components/doctor-avatar";
 import { track } from "@/lib/track";
+import { doctorSlug } from "@/lib/doctor-slug";
 
 // Role lists come from the central config in lib/roles.ts — never hard-code them.
 const CAN_STATUS = rolesWith("set_doctor_status");
@@ -213,7 +214,8 @@ function shareHref(d: Doctor): string {
     todayHours: timetableFallback(d.timetable, istDayKey(), d.consultation_timing),
     place: d.hospital,
     number: callTarget(d)?.number ?? null,
-    link: `${typeof window !== "undefined" ? window.location.origin : ""}/doctors?q=${encodeURIComponent(d.name)}`,
+    // Share the doctor's OWN page — a forward lands on one doctor, not a search.
+    link: `${typeof window !== "undefined" ? window.location.origin : ""}/doctors/${doctorSlug({ id: String(d.id), name: d.name })}`,
   });
   return `https://wa.me/?text=${encodeURIComponent(msg)}`;
 }
@@ -986,6 +988,12 @@ export default function DoctorsPage() {
                   className="mt-2 block text-center text-xs font-semibold text-emerald-700 hover:underline"
                 >
                   📤 Share this doctor on WhatsApp
+                </a>
+                <a
+                  href={`/doctors/${doctorSlug({ id: String(d.id), name: d.name })}`}
+                  className="mt-1 block text-center text-xs text-blue-600 hover:underline"
+                >
+                  Open full page ↗
                 </a>
 
                 {/* Weekly pattern — the full answer to "when do they sit?" */}
