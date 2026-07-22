@@ -5,6 +5,7 @@ import { statusFreshness, describeAge } from "@/lib/status-freshness";
 import { istDayKey } from "@/lib/ist";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { track } from "@/lib/track";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WhatsApp Status Board — Phase 1's marketing engine (~15 min/day, ₹0 budget).
@@ -111,6 +112,7 @@ export default function StatusBoardPage() {
     void (async () => {
       await load();
     })();
+    track("board_view");
   }, []);
 
   // Keep the address bar sharable: the URL always names the current slice.
@@ -333,6 +335,7 @@ export default function StatusBoardPage() {
               <div className="mt-3 flex flex-col sm:flex-row gap-2">
                 <a
                   href={`https://wa.me/?text=${encodeURIComponent(message)}`}
+                  onClick={() => track("board_share")}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 py-3 text-center text-sm font-bold text-white"

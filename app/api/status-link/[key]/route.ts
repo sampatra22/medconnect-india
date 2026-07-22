@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { guarded } from "@/lib/api";
 import { rateLimit } from "@/lib/rate-limit";
 import { statusFreshness, statusHasQueue, timetableFallback } from "@/lib/status-freshness";
+import { bumpMetric } from "@/lib/metrics";
 import { istDayKey } from "@/lib/ist";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -174,5 +175,7 @@ export const PUT = guarded(async (
   });
 
   const fresh = await prisma.doctor.findUnique({ where: { id: doctor.id } });
+  // Chamber-made updates are the supply-side metric that matters most.
+  void bumpMetric("pa_status_update");
   return NextResponse.json({ doctor: view(fresh!) });
 });

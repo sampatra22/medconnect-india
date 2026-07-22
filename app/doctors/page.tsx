@@ -14,6 +14,7 @@ import { doctorShareMessage } from "@/lib/doctor-share";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { DoctorAvatar } from "@/components/doctor-avatar";
+import { track } from "@/lib/track";
 
 // Role lists come from the central config in lib/roles.ts — never hard-code them.
 const CAN_STATUS = rolesWith("set_doctor_status");
@@ -314,6 +315,7 @@ export default function DoctorsPage() {
       setSearch(q);
       setDebouncedSearch(q); // skip the debounce delay on a deep link
     }
+    track("directory_view"); // once per visit, not per filter change
   }, []);
 
   // One keystroke pause = one server query.
@@ -551,6 +553,7 @@ export default function DoctorsPage() {
                     // real controls (call, share, status buttons, history…),
                     // which must keep doing their own job.
                     if ((e.target as HTMLElement).closest("button, a, input, select, textarea, label")) return;
+                    track("detail_open");
                     setDetailDoc(d);
                   }}
                   onKeyDown={(e) => {
@@ -803,6 +806,7 @@ export default function DoctorsPage() {
                     return (
                       <a
                         href={telHref(t.number)}
+                        onClick={() => track("call_tap")}
                         className="mt-3 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-700 py-2.5 text-sm font-bold text-white"
                       >
                         📞 {live ? "Call chamber" : "Call to check today's timing"}
@@ -814,6 +818,7 @@ export default function DoctorsPage() {
                   })()}
                   <a
                     href={shareHref(d)}
+                    onClick={() => track("share_tap")}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="mt-2 text-center text-xs text-emerald-700 hover:underline"
@@ -951,6 +956,7 @@ export default function DoctorsPage() {
                   {t ? (
                     <a
                       href={telHref(t.number)}
+                      onClick={() => track("call_tap")}
                       className="rounded-xl bg-emerald-600 py-3 text-center text-sm font-bold text-white active:bg-emerald-700"
                     >
                       📞 Call
@@ -961,6 +967,7 @@ export default function DoctorsPage() {
                   ) : null}
                   <a
                     href={directionsHref(d)}
+                    onClick={() => track("directions_tap")}
                     target="_blank"
                     rel="noopener noreferrer"
                     className={`rounded-xl bg-blue-600 py-3 text-center text-sm font-bold text-white active:bg-blue-700 ${t ? "" : "col-span-2"}`}
@@ -973,6 +980,7 @@ export default function DoctorsPage() {
                 </div>
                 <a
                   href={shareHref(d)}
+                  onClick={() => track("share_tap")}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="mt-2 block text-center text-xs font-semibold text-emerald-700 hover:underline"

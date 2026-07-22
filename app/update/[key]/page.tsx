@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { describeAge, type StatusFreshness } from "@/lib/status-freshness";
 import { doctorShareMessage } from "@/lib/doctor-share";
+import { track } from "@/lib/track";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The PA's page. One doctor, six huge buttons, no login, no navigation.
@@ -52,6 +53,7 @@ export default function PaUpdatePage() {
         const { doctor } = await res.json();
         setDoctor(doctor);
         setState("ready");
+        track("pa_page_view");
       } else {
         setState("dead");
       }

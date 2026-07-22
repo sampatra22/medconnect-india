@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 // queue that never gets worked.
 const LINKS = [
   { href: "/admin/doctors", label: "🩺 Doctor Approvals" },
+  { href: "/admin/stats", label: "📊 Usage" },
   { href: "/admin/users", label: "👥 Users" },
   { href: "/doctors", label: "📖 Directory" },
   { href: "/account", label: "🔐 Account" },

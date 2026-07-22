@@ -6,6 +6,7 @@ import { rolesWith } from "@/lib/roles";
 import { guarded } from "@/lib/api";
 import { rateLimit } from "@/lib/rate-limit";
 import { statusHasQueue } from "@/lib/status-freshness";
+import { bumpMetric } from "@/lib/metrics";
 
 const STATUSES = ["available", "busy", "holiday", "no_mr_today", "token_full", "opd_closed"];
 // Role lists come from the central config in lib/roles.ts — never hard-code them.
@@ -126,5 +127,7 @@ export const PUT = guarded(async (
     },
     include: { updates: { orderBy: { createdAt: "desc" }, take: 20 } },
   });
+  // The Phase-1 pulse: how many statuses got confirmed today. Fire-and-forget.
+  void bumpMetric("status_update");
   return NextResponse.json({ doctor: serializeDoctor(updated) });
 });

@@ -321,6 +321,20 @@ review says otherwise.
   `＋ Add "<what you typed>" to the directory`, prefilling the name.
   **Still missing here: the consent checkbox** (pre-launch blocker 2).
 
+- **Done 2026-07-22 (21): usage analytics (zero-PII).** `Metric` model +
+  migration `20260722120000_usage_metrics` (**apply before deploy**): one row
+  per IST day per event, atomic upsert-increment. NO sessions/user-ids/IPs —
+  a COUNT can't leak privacy, needs no cookie banner. `lib/metrics.bumpMetric`
+  (server, fire-and-forget) counts truth events from the status + PA-link
+  routes (`status_update`, `pa_status_update`). `lib/track` (client,
+  sendBeacon so tel:/maps/wa.me navigations still register) + public
+  `POST /api/metrics` (whitelisted events only, per-IP capped) count
+  directory/board views, detail opens, call/directions/share taps, PA-page
+  views. `/admin/stats` — 14-day grid split SUPPLY (doctors kept fresh) vs
+  DEMAND (patients acting) + live doctor/MR totals, linked in admin nav
+  ("📊 Usage"). This makes the Phase-1 gate (~50 weekly-active MRs, dense
+  coverage) measurable instead of guessed.
+
 - **Done 2026-07-22 (20): E2E test campaign — 45/45 green against production.**
   `scripts/e2e-smoke.mjs <base-url>` plays six personas with real HTTP +
   cookie jars: anonymous patient, two fresh MR signups, the doctor account,
