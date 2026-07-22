@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { signIn } from "next-auth/react"
 import { Mail, Lock, Stethoscope } from "lucide-react"
 
@@ -18,7 +17,6 @@ import {
 import { homeFor } from "@/lib/roles"
 
 export function LoginModal() {
-  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -46,16 +44,17 @@ export function LoginModal() {
         return
       }
 
-      const session = await fetch("/api/auth/session")
+      const session = await fetch("/api/auth/session", { cache: "no-store" })
         .then((r) => r.json())
         .catch(() => null)
       const role = String(session?.user?.role || "").toLowerCase()
 
-      setOpen(false)
       resetForm()
-      // Landing page per role comes from the central config in lib/roles.ts
-      router.push(homeFor(role))
-      router.refresh()
+      // Full navigation, not router.push: the SessionProvider hasn't picked up
+      // the new cookie yet, so a client nav lands on a dashboard that bounces
+      // back to login (the "click twice" bug). A real page load starts fresh
+      // with the cookie present. Landing page per role from lib/roles.ts.
+      window.location.assign(homeFor(role))
     } catch {
       setError("Something went wrong. Please try again.")
       setLoading(false)

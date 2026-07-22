@@ -35,18 +35,21 @@ export default function LoginPage() {
       return;
     }
 
-    // Read the fresh session to route by role
-    const session = await fetch("/api/auth/session")
+    // The sign-in response has just set the session cookie, but the client
+    // SessionProvider that every dashboard's useSession() reads has NOT yet
+    // refetched it. A client-side router.push would land on a dashboard that
+    // still sees "unauthenticated" and bounces straight back here — which is
+    // exactly the "have to click twice" bug.
+    //
+    // Read the fresh session server-side (the cookie is present now), then do
+    // a FULL navigation: the destination loads with a fresh provider that
+    // sees the cookie from the first byte. One click, every role.
+    const session = await fetch("/api/auth/session", { cache: "no-store" })
       .then((r) => r.json())
       .catch(() => null);
     const role = String(session?.user?.role || "").toLowerCase();
-
-    setLoading(false);
-    // Landing pages come from the central role config — hard-coding them here
-    // is how this page ended up sending admins to /admin/users after the admin
-    // home moved to the approvals queue. One source of truth, per AGENTS.md.
-    router.push(homeFor(role));
-    router.refresh();
+    // Landing pages come from the central role config (one source of truth).
+    window.location.assign(homeFor(role));
   }
 
   return (

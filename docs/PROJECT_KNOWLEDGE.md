@@ -321,6 +321,16 @@ review says otherwise.
   `＋ Add "<what you typed>" to the directory`, prefilling the name.
   **Still missing here: the consent checkbox** (pre-launch blocker 2).
 
+- **Fixed 2026-07-22 (22): "log in twice" race — all roles.** `signIn(redirect:
+  false)` sets the cookie, but the client `SessionProvider` (read by every
+  dashboard's `useSession`) hadn't refetched it, so `router.push` landed on a
+  dashboard still seeing "unauthenticated" → its guard bounced back to /login;
+  the 2nd click worked because the provider had caught up. Fix in BOTH
+  `/login` page and the homepage `LoginModal`: after reading the fresh session
+  server-side, navigate with `window.location.assign(homeFor(role))` — a full
+  page load whose provider sees the cookie from the first byte. One click,
+  every role.
+
 - **Done 2026-07-22 (21): usage analytics (zero-PII).** `Metric` model +
   migration `20260722120000_usage_metrics` (**apply before deploy**): one row
   per IST day per event, atomic upsert-increment. NO sessions/user-ids/IPs —
